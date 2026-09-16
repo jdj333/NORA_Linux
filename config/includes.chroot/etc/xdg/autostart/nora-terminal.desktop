@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=NORA Terminal
+Comment=Talk to NORA's offline assistant
+Exec=/usr/local/bin/nora-terminal
+Icon=utilities-terminal
+Terminal=false
+OnlyShowIn=XFCE;

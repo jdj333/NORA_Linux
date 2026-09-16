@@ -1,0 +1,22 @@
+[Unit]
+Description=NORA offline language model
+After=local-fs.target
+ConditionPathExists=/opt/nora/llm/model.gguf
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/nora-llm
+DynamicUser=yes
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

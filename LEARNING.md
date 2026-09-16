@@ -296,6 +296,41 @@ These tests attach no host disk and do not validate installation.
   and physical hardware remain untested. Do not promote the prototype to a
   supported release based only on these VM checks.
 
+## Interactive desktop and offline chat lessons
+
+- macOS Screen Sharing connected a socket but stalled at its password dialog with
+  this QEMU VNC server using `auth=none`. The Linux password `live` is unrelated
+  to VNC authentication. `query-vnc` listing a client did not prove a usable desktop.
+- The user confirmed that noVNC in a browser worked. The current local viewer is
+  `http://127.0.0.1:6080/vnc.html?autoconnect=true&resize=scale`. Its container is
+  `nora-browser`; the QEMU container is `nora-desktop`. Check that both still exist
+  and are running before reusing these names. Keep published ports bound to
+  `127.0.0.1`, not all host interfaces.
+- The viewer was created from `nora-iso-verifier:trixie`, with Debian's `novnc` and
+  `python3-websockify` installed. The running command is
+  `websockify --web=/usr/share/novnc 6080 nora:5900`, where Docker's container link
+  resolves `nora` to `nora-desktop`. It does not change the ISO or guest desktop.
+- For a display fix, check HTTP delivery and the complete RFB authentication and
+  framebuffer initialization. A socket connection or an independent QMP screenshot
+  alone does not prove the user's viewer works.
+- Offline chat build instructions and pinned model provenance are in [CHAT.md](CHAT.md)
+  and `scripts/prepare-llm.py`. Read these before downloading new model files.
+  `config/includes.chroot/opt/nora/llm/` is generated and ignored by Git.
+- llama.cpp's GitHub `releases/latest` returned a semantic release with only
+  `nightly-tag.txt`, not CPU archives. Resolve that file to the corresponding build
+  release, then pin its artifact URL and published digest. The prepared runtime
+  dynamically loads implementation and CPU libraries; copying only `llama-server`
+  is insufficient.
+- A process started through an amd64 chroot on this ARM host appeared as
+  `/usr/bin/qemu-x86_64 ./llama-server ...` in `/proc`, not as `./llama-server`.
+  Inspect actual process arguments before trying to stop a model test.
+- The existing filesystem already had Python GI, GTK3 introspection, and libgomp.
+  They are now explicit package requirements. Recheck installed packages when
+  changing the base, rather than assuming desktop dependencies remain transitive.
+- A real generated reply and transport tests are separate from a fresh boot test
+  of systemd startup, Xfce autostart, and the chat window. Verify all layers before
+  claiming that the bundled assistant works from the ISO.
+
 When extending these notes, record the symptom, confirmed cause or clearly labeled
 hypothesis, smallest working fix, reusable command, and verification limit. Keep
 artifact-specific results in `VALIDATION.md` and reusable lessons here.

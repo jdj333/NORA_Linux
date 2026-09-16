@@ -10,6 +10,10 @@ if [[ $EUID != 0 ]]; then
   exit 1
 fi
 command -v lb >/dev/null
+test -s config/includes.chroot/opt/nora/llm/model.gguf || {
+  echo 'Run python3 scripts/prepare-llm.py before building (see README.md).' >&2
+  exit 1
+}
 mkdir -p dist
 lb config
 lb build 2>&1 | tee dist/build.log

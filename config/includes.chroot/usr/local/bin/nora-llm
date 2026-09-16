@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+cd /opt/nora/llm
+export LD_LIBRARY_PATH=/opt/nora/llm
+exec ./llama-server --model /opt/nora/llm/model.gguf \
+  --alias nora-local --host 127.0.0.1 --port 8088 \
+  --ctx-size 4096 --parallel 1 --threads 2 --threads-batch 2 \
+  --batch-size 128 --ubatch-size 128 --n-gpu-layers 0 \
+  --offline --cors-origins localhost --no-agent --no-ui --no-warmup

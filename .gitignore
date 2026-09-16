@@ -16,3 +16,5 @@
 /config/chroot
 /config/common
 /config/source
+/config/includes.chroot/opt/nora/llm/
+__pycache__/

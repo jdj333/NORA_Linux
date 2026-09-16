@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+test -s /opt/nora/llm/model.gguf
+test -x /opt/nora/llm/llama-server
+chmod 755 /usr/local/bin/nora-terminal /usr/local/bin/nora-llm
+# Files copied from a macOS host may carry host UID/GID numbers.
+chown -R 0:0 /opt/nora /usr/share/nora/chat
+chmod -R a+rX /opt/nora /usr/share/nora/chat
+systemctl enable nora-llm.service
+dpkg-query -W -f='${binary:Package}\t${Version}\n' > /usr/share/nora/build-packages.txt
