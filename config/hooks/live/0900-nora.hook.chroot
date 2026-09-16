@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+# Divert the Debian-owned identity so base-files upgrades preserve NORA's name.
+dpkg-divert --local --add --rename --divert /usr/lib/os-release.debian /usr/lib/os-release
+cat > /usr/lib/os-release <<'EOF'
+PRETTY_NAME="NORA Linux 13 (Emerald)"
+NAME="NORA Linux"
+VERSION_ID="13"
+VERSION="13 (Emerald)"
+ID=nora
+ID_LIKE=debian
+VERSION_CODENAME=trixie
+DEBIAN_VERSION_FULL=13
+EOF
+ln -sf ../usr/lib/os-release /etc/os-release
+printf 'NORA Linux 13 (Emerald) \\n \\l\n' > /etc/issue
+printf 'NORA Linux 13 (Emerald)\n' > /etc/issue.net
+mkdir -p /etc/lightdm/lightdm-gtk-greeter.conf.d
+cat > /etc/lightdm/lightdm-gtk-greeter.conf.d/90-nora.conf <<'EOF'
+[greeter]
+theme-name=NORA-Emerald
+icon-theme-name=Adwaita
+background=/usr/share/backgrounds/nora/logo.png
+EOF
+# Point Xfce's packaged default wallpaper at the original logo without cropping.
+mkdir -p /usr/share/backgrounds/xfce
+ln -sf /usr/share/backgrounds/nora/logo.png /usr/share/backgrounds/xfce/xfce-blue.jpg
+mkdir -p /etc/xdg/autostart /usr/local/bin
+chmod 755 /usr/local/bin/nora-desktop-defaults
+cat > /etc/xdg/autostart/nora-desktop-defaults.desktop <<'EOF'
+[Desktop Entry]
+Type=Application
+Name=NORA Desktop Defaults
+Exec=/usr/local/bin/nora-desktop-defaults
+OnlyShowIn=XFCE;
+NoDisplay=true
+EOF
+mkdir -p /usr/share/nora
+dpkg-query -W -f='${binary:Package}\t${Version}\n' > /usr/share/nora/build-packages.txt

@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+# Only adjust visible labels; retain Debian's generated boot commands.
+test -d boot
+test -d isolinux
+find boot isolinux -type f -name '*.cfg' |
+while IFS= read -r file; do
+  sed -i \
+    -e '/^[[:space:]]*menuentry /s/Live system/NORA Linux Live/g' \
+    -e '/^[[:space:]]*menu label /s/Live system/NORA Linux Live/g' \
+    -e 's/menu title Boot menu/menu title NORA Linux 13 - Emerald/' \
+    "$file"
+done
+if [ -f isolinux/stdmenu.cfg ]; then
+  sed -i -e '/^menu background /d' -e 's/#76a1d0ff/#ff087f5b/g' isolinux/stdmenu.cfg
+  printf '\nmenu color screen * #ffe4f2ec #ff07130f none\n' >> isolinux/stdmenu.cfg
+fi
+if [ -f boot/grub/live-theme/theme.txt ]; then
+  sed -i \
+    -e 's|^desktop-image:.*|desktop-color: "#07130f"|' \
+    -e 's|^title-text:.*|title-text: "NORA Linux 13 - Emerald"|' \
+    -e 's|selected_item_color= "#ffffff"|selected_item_color= "#10b981"|' \
+    boot/grub/live-theme/theme.txt
+fi

@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+marker="$HOME/.config/nora-desktop-initialized"
+[ ! -e "$marker" ] || exit 0
+# Xfce may use implicit wallpaper defaults with no last-image properties yet.
+# Wait for X11 outputs, then create explicit settings for each connected display.
+monitors=""
+for attempt in $(seq 1 30); do
+  monitors=$(xrandr --query 2>/dev/null | awk '$2 == "connected" {print $1}')
+  [ -z "$monitors" ] || break
+  sleep 1
+done
+[ -n "$monitors" ] || exit 0
+for monitor in $monitors; do
+  for workspace in 0 1 2 3; do
+    base="/backdrop/screen0/monitor${monitor}/workspace${workspace}"
+    xfconf-query -c xfce4-desktop -p "$base/last-image" -n -t string -s /usr/share/backgrounds/nora/logo.png
+    xfconf-query -c xfce4-desktop -p "$base/image-style" -n -t int -s 4
+    xfconf-query -c xfce4-desktop -p "$base/color-style" -n -t int -s 0
+    xfconf-query -c xfce4-desktop -p "$base/rgba1" -n -a \
+      -t double -s 0.027 -t double -s 0.0745 -t double -s 0.0588 -t double -s 1.0
+  done
+done
+mkdir -p "$HOME/.config"
+touch "$marker"

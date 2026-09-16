@@ -1,0 +1,6 @@
+FROM debian:trixie
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    qemu-system-x86 ovmf python3 xorriso squashfs-tools \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /test
+CMD ["bash"]

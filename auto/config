@@ -1,0 +1,17 @@
+#!/bin/sh
+set -eu
+lb config noauto \
+  --mode debian --distribution trixie --architectures amd64 \
+  --binary-image iso-hybrid --bootloaders "syslinux grub-efi" \
+  --archive-areas "main contrib non-free non-free-firmware" \
+  --security true --updates true \
+  --mirror-bootstrap https://deb.debian.org/debian/ \
+  --mirror-chroot-security https://security.debian.org/debian-security/ \
+  --mirror-binary https://deb.debian.org/debian/ \
+  --mirror-binary-security https://security.debian.org/debian-security/ \
+  --firmware-chroot true --firmware-binary true \
+  --debian-installer live --debian-installer-gui true \
+  --bootappend-live "boot=live components quiet hostname=nora username=nora locales=en_US.UTF-8 keyboard-layouts=us" \
+  --iso-application "NORA Linux" --iso-publisher "NORA Linux" \
+  --iso-volume "NORA_LINUX" --image-name nora-linux-13 \
+  --checksums sha256 "$@"
