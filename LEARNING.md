@@ -390,6 +390,13 @@ These tests attach no host disk and do not validate installation.
   run with `python3 -m unittest discover -s tests -v`, including chunk-boundary
   reconstruction, checksums, tampered inputs, missing inputs, and stale output.
   CI structural/manifest checks do not establish desktop boot or installation.
+- The first hosted run exposed an HTTP cancellation race: for an HTTP/1.0 or
+  `Connection: close` response, Python clears `HTTPConnection.sock` after headers
+  while the response still streams. Retain the connected socket for shutdown and
+  explicitly close the response. The regression test waits for a client-received
+  chunk before cancelling; waiting only for the server to send headers can mask it.
+  A macOS rerun also exposed duplicate SIGTERM from UI and worker threads; serialize
+  signals and send TERM at most once, while retaining escalation to KILL.
 
 When extending these notes, record the symptom, confirmed cause or clearly labeled
 hypothesis, smallest working fix, reusable command, and verification limit. Keep

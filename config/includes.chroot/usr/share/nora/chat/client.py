@@ -59,10 +59,11 @@ class ChatRequest:
     def __init__(self, host='127.0.0.1', port=8088):
         self.connection = http.client.HTTPConnection(host, port, timeout=300)
         self.cancelled = threading.Event()
+        self.stream_socket = None
 
     def cancel(self):
         self.cancelled.set()
-        sock = self.connection.sock
+        sock = self.stream_socket or self.connection.sock
         if sock is not None:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
@@ -71,10 +72,14 @@ class ChatRequest:
 
     def stream(self, messages, on_chunk):
         text = []
+        response = None
         try:
             if self.cancelled.is_set():
                 raise Cancelled()
             self.connection.connect()
+            # HTTPConnection drops its socket reference for Connection: close
+            # responses. The response's file still owns it while streaming.
+            self.stream_socket = self.connection.sock
             if self.cancelled.is_set():
                 raise Cancelled()
             self.connection.request('POST', '/v1/chat/completions', body=json.dumps({
@@ -121,4 +126,7 @@ class ChatRequest:
         except (ValueError, KeyError, TypeError) as error:
             raise ChatError('The local model sent an invalid reply. Please retry.') from error
         finally:
+            if response is not None:
+                response.close()
             self.connection.close()
+            self.stream_socket = None

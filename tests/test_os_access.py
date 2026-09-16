@@ -138,12 +138,20 @@ class CommandsTests(unittest.TestCase):
         request = CommandRequest('printf started; sleep 30', self.cwd)
         started = threading.Event()
         results = []
-        thread = threading.Thread(target=lambda: results.append(request.run(lambda _: started.set())))
+        errors = []
+        def worker():
+            try:
+                results.append(request.run(lambda _: started.set()))
+            except Exception as error:
+                errors.append(error)
+        thread = threading.Thread(target=worker)
         thread.start()
         self.assertTrue(started.wait(2))
         request.cancel()
+        request.cancel()  # Repeated UI/worker cancellation must be idempotent.
         thread.join(3)
         self.assertFalse(thread.is_alive())
+        self.assertEqual(errors, [])
         self.assertEqual(results[0].reason, 'stopped by you')
 
     def test_close_can_kill_immediately(self):

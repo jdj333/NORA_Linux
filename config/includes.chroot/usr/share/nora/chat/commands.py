@@ -86,6 +86,7 @@ class CommandRequest:
         self.process = None
         self.lock = threading.Lock()
         self.signal_lock = threading.Lock()
+        self.term_sent = False
         self.hard_killed = False
 
     def cancel(self, kill=False):
@@ -96,9 +97,9 @@ class CommandRequest:
 
     def signal_group(self, process, number):
         with self.signal_lock:
-            # Closing the window and the worker's timeout loop may race. Do not
-            # send another signal after SIGKILL, or target a reused group ID.
-            if self.hard_killed:
+            # UI cancellation and the worker may race. Send TERM only once,
+            # and never signal again after KILL (the group may already be gone).
+            if self.hard_killed or (number == signal.SIGTERM and self.term_sent):
                 return
             try:
                 os.killpg(process.pid, number)
@@ -111,6 +112,8 @@ class CommandRequest:
                     raise
             if number == signal.SIGKILL:
                 self.hard_killed = True
+            elif number == signal.SIGTERM:
+                self.term_sent = True
 
     def run(self, on_chunk):
         started = time.monotonic()

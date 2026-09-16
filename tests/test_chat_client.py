@@ -27,6 +27,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.mode == 'unavailable':
             return
         if self.mode == 'wait':
+            self.wfile.write(b'data: {"choices":[{"delta":{"content":"begin"}}]}\n\n')
             self.wfile.flush()
             self.connected.set()
             self.release.wait(3)
@@ -92,18 +93,25 @@ class ChatTests(unittest.TestCase):
     def test_cancel_unblocks_waiting_stream(self):
         Handler.mode = 'wait'
         errors = []
+        received = threading.Event()
         def worker():
             try:
-                self.request.stream(self.messages, lambda _: None)
+                self.request.stream(self.messages, lambda _: received.set())
             except Exception as error:
                 errors.append(error)
         thread = threading.Thread(target=worker)
         thread.start()
-        self.assertTrue(Handler.connected.wait(2))
-        self.request.cancel()
-        thread.join(2)
-        Handler.release.set()
-        self.assertFalse(thread.is_alive())
+        try:
+            # Wait until the client has consumed the HTTP/1.0 headers and first
+            # chunk. Cancelling earlier masked a dropped socket reference.
+            self.assertTrue(received.wait(2))
+            self.assertIsNone(self.request.connection.sock)
+            self.request.cancel()
+            thread.join(2)
+            self.assertFalse(thread.is_alive())
+        finally:
+            Handler.release.set()
+            thread.join(4)
         self.assertEqual(len(errors), 1)
         self.assertIsInstance(errors[0], Cancelled)
 
