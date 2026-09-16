@@ -1,4 +1,6 @@
 /dist/
+/release/
+/diagnostics/
 /.build/
 /cache/
 /chroot/

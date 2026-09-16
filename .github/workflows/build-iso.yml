@@ -1,0 +1,123 @@
+name: Build and release NORA ISO
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Finish an in-flight release; never cancel it halfway through an upload.
+concurrency:
+  group: nora-iso-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: build-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check source and run tests
+        run: |
+          python3 --version
+          python3 -m unittest discover -s tests -v
+          for file in scripts/*.sh; do bash -n "$file"; done
+          sh -n auto/config
+          for file in config/hooks/live/*.hook.*; do sh -n "$file"; done
+
+      - name: Make room for the live filesystem
+        run: |
+          # Only unused SDKs on this disposable GitHub-hosted runner.
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          df -h .
+          available=$(df -B1 --output=avail . | tail -n 1)
+          if (( available < 30 * 1024 * 1024 * 1024 )); then
+            echo 'At least 30 GiB free is required for this build.' >&2
+            exit 1
+          fi
+
+      - name: Prepare checksum-pinned offline model
+        run: python3 scripts/prepare-llm.py
+
+      - name: Build Debian 13 amd64 ISO
+        run: |
+          docker build --pull --platform linux/amd64 -t nora-builder:ci .
+          # No workspace mount or repository token enters the privileged builder.
+          docker run --name nora-ci-build --platform linux/amd64 --privileged nora-builder:ci
+          mkdir -p dist
+          docker cp nora-ci-build:/build/dist/. dist/
+          (cd dist && sha256sum -c SHA256SUMS)
+
+      - name: Verify the ISO's internal manifest
+        run: |
+          docker run -d --name nora-ci-build-verifier --entrypoint sleep nora-builder:ci infinity
+          trap 'docker stop nora-ci-build-verifier' EXIT
+          docker cp dist/nora-linux-13-amd64.hybrid.iso nora-ci-build-verifier:/tmp/nora.iso
+          docker exec nora-ci-build-verifier bash -euc '
+            xorriso -osirrox on -indev /tmp/nora.iso -extract / /tmp/iso-check > /tmp/extract.log 2>&1
+            cd /tmp/iso-check
+            sha256sum -c sha256sum.txt > /tmp/internal-sha256.log 2>&1
+          '
+          docker cp nora-ci-build-verifier:/tmp/internal-sha256.log dist/internal-sha256.log
+
+      - name: Package release assets
+        env:
+          BUILD_COMMIT: ${{ github.sha }}
+          BUILD_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          metadata = {'commit': os.environ['BUILD_COMMIT'], 'run_url': os.environ['BUILD_RUN_URL'],
+                      'tag': os.environ['RELEASE_TAG'], 'architecture': 'amd64', 'suite': 'trixie'}
+          Path('dist/build-info.json').write_text(json.dumps(metadata, indent=2) + '\n')
+          PY
+          python3 scripts/package-release.py dist release
+
+      - name: Upload assets and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          BUILD_COMMIT: ${{ github.sha }}
+        run: |
+          gh release create "$RELEASE_TAG" --target "$BUILD_COMMIT" --draft --prerelease \
+            --title "NORA Linux 13 — $RELEASE_TAG" --notes-file release/README-download.md
+          gh release upload "$RELEASE_TAG" release/*
+          gh release edit "$RELEASE_TAG" --draft=false
+          gh release view "$RELEASE_TAG" --json url --jq .url >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Collect build diagnostics
+        if: always()
+        run: |
+          mkdir -p diagnostics
+          if docker inspect nora-ci-build >/dev/null 2>&1; then
+            docker logs nora-ci-build > diagnostics/container.log 2>&1
+            docker cp nora-ci-build:/build/dist/build.log diagnostics/build.log || true
+          fi
+          if docker inspect nora-ci-build-verifier >/dev/null 2>&1; then
+            docker cp nora-ci-build-verifier:/tmp/extract.log diagnostics/extract.log || true
+            docker cp nora-ci-build-verifier:/tmp/internal-sha256.log diagnostics/internal-sha256.log || true
+          fi
+          for file in dist/*.txt dist/*.json dist/*.log dist/SHA256SUMS; do
+            if [[ -f "$file" ]]; then cp "$file" diagnostics/; fi
+          done
+
+      - name: Retain diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: nora-build-diagnostics-${{ github.run_id }}-${{ github.run_attempt }}
+          path: diagnostics/
+          if-no-files-found: warn
+          retention-days: 14

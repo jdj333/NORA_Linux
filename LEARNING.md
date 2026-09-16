@@ -331,6 +331,66 @@ These tests attach no host disk and do not validate installation.
   of systemd startup, Xfce autostart, and the chat window. Verify all layers before
   claiming that the bundled assistant works from the ISO.
 
+## OS access and incremental rebuild lessons
+
+- Keep common system measurements deterministic. Read `/proc/meminfo` using
+  `MemAvailable`, and use filesystem statistics for disk space. A live ISO's
+  writable overlay is temporary and does not report the host Mac's disk capacity.
+  Label sources and observation time; never sum root and home blindly.
+- Give the small model a compact fresh OS snapshot and the last real command
+  result. Large context slows prompt evaluation substantially under emulation.
+  The live `nora` user cannot see the system journal without elevation; use
+  `sudo journalctl -u nora-llm -b --no-pager` to inspect actual model progress.
+  Model-generated text is only a proposal; `/run` executes explicit user input,
+  and the Run button executes the displayed, editable proposal.
+- Run `python3 -m unittest discover -s tests -v` after command-runner changes.
+  Verify actual file effects, stderr/exit status, process-group cancellation,
+  child-held output pipes, time/output limits, and window-close races. A unittest
+  run can say OK while a background thread throws: capture thread exceptions in
+  cancellation tests. macOS may return EPERM for an already-dead process group;
+  confirm the process exited before treating that error as harmless.
+- For a temporary guest update, stage only the application overlay in a dedicated
+  directory and serve it on container loopback, for example:
+  `python3 -m http.server 8091 --bind 127.0.0.1 --directory /test/nora-update`.
+  QEMU user networking reaches this at `http://10.0.2.2:8091/`. Do not expose the
+  entire artifact directory or publish this transfer port. Stop the server after
+  use. Normalize tar ownership to root and mtime to zero to avoid clock-skew
+  warnings between the macOS host and guest.
+- Check Docker VM RAM, not host Mac RAM: this Docker VM had about 1.9 GiB, despite
+  the Mac having 32 GB. QEMU exited when compression ran alongside it; memory
+  pressure is a likely cause, not a confirmed OOM diagnosis. Finish repacking,
+  extraction, and copies before booting the desktop VM on this constrained host.
+- The retained guest kernel has `CONFIG_SQUASHFS_ZSTD=y`. Native ARM64 repacking
+  can use `mksquashfs /test/rootfs /test/new.squashfs -noappend -comp zstd
+  -Xcompression-level 6 -no-progress -processors 1 -mem 256M` for a faster,
+  somewhat larger development image. This does not change live-build's configured
+  compression. Regenerate both internal manifests, replay the ISO boot records,
+  extract and verify every manifest entry, hash the delivered copy, and boot that
+  exact image. Preserve previous validated ISOs under their original names.
+
+## GitHub build and release workflow
+
+- `.github/workflows/build-iso.yml` builds on `main` pushes and manual runs on
+  `main`. It uses a native amd64 Ubuntu runner to run the Debian 13 Docker builder;
+  the host distribution does not become the ISO base. Prepare the pinned model
+  before `docker build`, because the Dockerfile requires its generated overlay.
+- GitHub release assets must each be under 2 GiB. Our roughly 3 GB ISO must be
+  split; compressing an already compressed SquashFS does not reliably solve this.
+  `python3 scripts/package-release.py dist release` creates 1,900 MiB parts,
+  checksums for the parts and whole ISO, and exact reassembly instructions. Use a
+  fresh output directory. Packaging verifies the whole ISO against `SHA256SUMS`.
+- Publication creates a draft, uploads assets, then publishes a prerelease.
+  Tags include run ID and attempt, and target the built SHA. Failed uploads leave
+  drafts rather than incomplete public downloads. Reruns create distinct tags.
+- CI uses no host mounts or GitHub token inside the privileged builder. It removes
+  only unused SDK directories on the disposable hosted runner and checks for
+  30 GiB free before building. Diagnostics survive build failures as 14-day Actions
+  artifacts. Publishing permission is `contents: write`; no personal token is needed.
+- Workflow validation: `actionlint .github/workflows/build-iso.yml`. Package tests
+  run with `python3 -m unittest discover -s tests -v`, including chunk-boundary
+  reconstruction, checksums, tampered inputs, missing inputs, and stale output.
+  CI structural/manifest checks do not establish desktop boot or installation.
+
 When extending these notes, record the symptom, confirmed cause or clearly labeled
 hypothesis, smallest working fix, reusable command, and verification limit. Keep
 artifact-specific results in `VALIDATION.md` and reusable lessons here.

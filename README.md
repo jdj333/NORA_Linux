@@ -11,13 +11,46 @@ no voice assistant is implemented.
 
 NORA Terminal opens at login for typed conversations with a bundled, offline
 Qwen2.5 0.5B model. No API key or internet is needed after boot. It explains
-commands but does not execute them. See [CHAT.md](CHAT.md) for usage and limitations.
+its running OS using live measurements and executes explicit `/run` commands.
+Model-suggested commands have an editable Run button. See [CHAT.md](CHAT.md) for
+usage and command limits.
 
 The first ISO and verification evidence are in `dist/`. See [VALIDATION.md](VALIDATION.md)
 for the tested artifact, checksum, and remaining validation.
-The chat-enabled ISO is `dist/nora-linux-13-chat-amd64.hybrid.iso`; see
-[CHAT_VALIDATION.md](CHAT_VALIDATION.md) for its offline conversation and startup checks.
+The current system-aware chat ISO is `dist/nora-linux-13-system-amd64.hybrid.iso`;
+see [OS_ACCESS_VALIDATION.md](OS_ACCESS_VALIDATION.md) for its checks and checksum.
+[CHAT_VALIDATION.md](CHAT_VALIDATION.md) records the earlier conversation-only image.
 Read [LEARNING.md](LEARNING.md) before rebuilding for reusable commands and known gotchas.
+
+## GitHub Actions releases
+
+[Build and release NORA ISO](https://github.com/jdj333/NORA_Linux/actions/workflows/build-iso.yml)
+runs on pushes to `main`, or manually with **Run workflow** on `main`. Each successful
+run publishes a new [GitHub prerelease](https://github.com/jdj333/NORA_Linux/releases)
+tagged `build-RUN_ID-ATTEMPT`, targeting the exact source commit. Builds use a native
+amd64 runner and the Debian 13 Docker builder, including the pinned offline model.
+No additional repository secret is needed: publishing uses GitHub's built-in token.
+
+The workflow runs tests, checks BIOS/UEFI ISO structure and the internal SHA-256
+manifest, then uploads all assets to a draft before publishing it. These checks do
+not replace VM boot or installation testing. Build logs remain Actions artifacts
+for 14 days, including on failure. A failed upload leaves an unpublished draft;
+rerunning creates a new attempt tag without overwriting a published image.
+
+GitHub's [release asset limit](https://docs.github.com/en/repositories/releasing-projects-on-github/about-releases)
+is less than 2 GiB per file, so the ISO is stored in numbered parts of at most
+1,900 MiB. Download all parts and both checksum files from **one release** into an
+empty directory, then reconstruct the ISO on macOS or Linux:
+
+```sh
+shasum -a 256 -c SHA256SUMS.parts
+cat nora-linux-13-amd64.hybrid.iso.part-* > nora-linux-13-amd64.hybrid.iso
+shasum -a 256 -c SHA256SUMS
+```
+
+Require every checksum to report OK. Boot or flash the reconstructed `.iso`;
+individual parts cannot boot. Each release includes these instructions, installed
+package versions, verification reports, and the source commit/build URL.
 
 ## Build on Debian 13 amd64
 
