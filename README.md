@@ -25,6 +25,14 @@ both an answer and what happens on your computer.
 [Feature history](FEATURE_LOG.md) ·
 [Test feedback loops](TEST_FEEDBACK_LOOPS.md)
 
+## Raspberry Pi 5 edition
+
+NORA now has a separate **ARM64 Raspberry Pi 5 image build**, with the same
+emerald desktop, local chat, canvas and offline voice. Flash the `.img.xz` image
+with Raspberry Pi Imager; the PC `.iso` is not compatible with the Pi.
+See [Raspberry Pi setup, build instructions and hardware test checklist](RASPBERRY_PI.md).
+Physical Pi 5 validation is still required.
+
 ## One workspace for conversation, ideas, and action
 
 NORA Terminal opens maximized when you log in. Its dark forest surfaces, mint
@@ -72,9 +80,9 @@ NORA is a working prototype built on **Debian 13 (Trixie)** with an Xfce desktop
 It tracks Trixie, security, and point updates rather than Debian testing or a
 future major release.
 
-The current build is an **amd64 live ISO for Intel/AMD PCs**, with hybrid USB/DVD
+The PC build is an **amd64 live ISO for Intel/AMD PCs**, with hybrid USB/DVD
 support, BIOS and UEFI boot entries, and Debian's live installer. It does not boot
-on Raspberry Pi or other ARM devices; those need a separate ARM image. Secure
+on Raspberry Pi or other ARM devices; use the separate [Pi image](RASPBERRY_PI.md). Secure
 Boot and physical hardware compatibility still require testing.
 
 Interaction supports **typing and local voice**. Speech loads at startup and reads chat replies aloud in English.

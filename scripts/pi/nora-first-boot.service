@@ -1,0 +1,19 @@
+[Unit]
+Description=NORA first boot account setup
+After=cloud-final.service systemd-user-sessions.service
+Before=lightdm.service
+ConditionPathExists=!/var/lib/nora/setup-complete
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/nora-first-boot
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty8
+TTYReset=yes
+RemainAfterExit=yes
+TimeoutStartSec=0
+
+[Install]
+WantedBy=graphical.target

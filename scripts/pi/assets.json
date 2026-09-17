@@ -1,0 +1,10 @@
+{
+  "base.img.xz": {
+    "url": "https://downloads.raspberrypi.com/raspios_lite_arm64/images/raspios_lite_arm64-2026-09-15/2026-09-15-raspios-trixie-arm64-lite.img.xz",
+    "sha256": "cdf4f3bfac35ae947b46e4e767f935453810549779ac3290e05a6754aee627e5"
+  },
+  "llama-arm64.tar.gz": {
+    "url": "https://github.com/ggml-org/llama.cpp/releases/download/b10964/llama-b10964-bin-ubuntu-arm64.tar.gz",
+    "sha256": "5f0e9c95d970892e43380f82ebcab960edfd20a1cd0f7abffa13b29fdb924949"
+  }
+}

@@ -673,3 +673,39 @@ artifact-specific results in `VALIDATION.md` and reusable lessons here.
   rather than killing/restarting the worker, preserving model memory.
 - Separate initialization latency from per-sentence inference. Preloading does
   not address the measured ~60-second synthesis of a short chunk under emulation.
+
+## Raspberry Pi 5 image build
+
+- A PC amd64 live ISO cannot boot Pi 5. The Pi edition uses an official Raspberry
+  Pi OS Lite ARM64 Trixie disk image with Pi firmware/kernel, then adds NORA.
+  See `RASPBERRY_PI.md`; `scripts/pi/assets.json` pins upstream image/runtime hashes.
+- On Apple Silicon, privileged ARM64 Docker can loop-mount an image stored in a
+  host bind mount. This avoids consuming the nearly full Colima virtual disk.
+  Do not resize/restart Colima while a paused test VM holds useful in-memory state.
+- `losetup --partscan` can create sysfs partitions without `/dev/loopNp1` nodes in
+  containers. Read `/sys/class/block/loopNp1/dev` and `mknod` the matching major/minor.
+- When overlay settings predate apt installation, use
+  `apt-get -o Dpkg::Options::=--force-confold install ...` to preserve NORA settings
+  and avoid EOF at a conffile prompt despite `DEBIAN_FRONTEND=noninteractive`.
+- Never edit a running shell script in place. Bash can resume at stale byte
+  offsets, causing parse errors. Final image must come from a clean uninterrupted
+  build after fixes; keep failed attempt logs in `.build/pi/`.
+- Keep ARM64 runtimes isolated: exclude generated `opt/nora/llm` and
+  `opt/nora/voice/python` from the common overlay. Copy only pinned model assets,
+  extract the pinned ARM64 llama.cpp release and install native hashed pip wheels.
+- Pi 5 normally uses a 16 KB-page kernel. `kernel=kernel8.img` selects Raspberry
+  Pi's supported 4 KB-page ARM64 kernel for compatibility with bundled speech libs.
+  Upstream reference: https://www.raspberrypi.com/documentation/computers/config_txt.html
+- First-boot account setup uses tty8 before LightDM, avoiding getty@tty1 conflicts.
+  Wait for cloud-final (if installed), retain Imager networking support, set the
+  default account to nora and require a password if provisioning has not set one.
+- Mount `/proc`, `/sys` and `/dev` for inference tests inside an image chroot.
+  Missing sysfs makes ONNX report CPU detection failures, obscuring actual results.
+- Reusable build and verification:
+  `python3 scripts/pi/prepare.py && python3 scripts/prepare-voice.py`
+  `docker build -t nora-pi-builder:trixie scripts/pi`
+  `docker run --rm --privileged -v "$PWD:/work" nora-pi-builder:trixie bash scripts/pi/build.sh`
+  `cd dist/pi && shasum -a 256 -c SHA256SUMS`
+- Automated native inference is not Pi hardware validation. Record SD boot,
+  filesystem expansion, graphics, microphone, HDMI/USB audio and actual Pi latency
+  separately. Never infer those results from an ARM64 container test.

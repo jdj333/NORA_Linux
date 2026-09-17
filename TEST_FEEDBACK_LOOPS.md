@@ -482,3 +482,54 @@ This checks local file targets, not HTTP reachability or rendered heading anchor
 - User confirmed microphone is off in the updated session and reports continued
   speech preparation delay. Native Mac speech synthesis is proposed, not
   implemented in this revision. Preloading does not fix per-sentence emulation cost.
+
+### TFL-018 — Raspberry Pi 5 ARM64 image
+
+- **PASS:** official Pi OS Lite ARM64 Trixie base and llama.cpp b10964 ARM64
+  archive SHA-256 verified against pinned `scripts/pi/assets.json`. Existing model
+  and voice asset locks reused without staging the amd64 executable.
+- **FAIL then fixed:** first build stopped at Xfce's configuration-file prompt.
+  Added explicit `--force-confold` to retain NORA's settings. Evidence:
+  `.build/pi/build-attempt-1.log`.
+- **FAIL then fixed:** editing the active build script caused a shell read-offset
+  parse error during attempt 2. Stopped editing active scripts and started a clean
+  build from the finalized recipe. Evidence: `.build/pi/build-attempt-2.log`.
+- **PASS:** preliminary image chroot loaded native ARM64 llama.cpp and generated
+  a completion; both Kokoro voices generated speech and Moonshine transcribed
+  "Hello Nora, please show me an idea." Silence produced no transcript. Network
+  disabled in the voice check. Evidence: `.build/pi/runtime-check.log`.
+- **PASS:** existing Linux application regression suite: **115 tests**, no skips,
+  6.389 seconds. Evidence: `.build/pi/application-regression.log`.
+- **PASS:** three Pi build configuration/shell tests:
+  `python3 -m unittest discover -s tests -p test_pi_build.py -v`.
+- Physical Pi 5 boot, first-boot password flow, filesystem expansion and actual
+  microphone/speaker playback are **NOT TESTED**. Native Mac ARM64 inference
+  results do not establish Pi performance.
+- **PASS:** disposable-container first-boot integration exercised real user
+  creation, password assignment, supplementary groups, LightDM autologin,
+  removal of passwordless sudo defaults and reuse of an already configured account.
+  Only `chvt`/`clear` were stubbed; real Pi console switching remains untested.
+  Reusable command:
+  `docker run --rm -v "$PWD:/work:ro" nora-pi-builder:trixie bash tests/run_pi_first_boot_smoke.sh`
+  Evidence: `.build/pi/first-boot-test.log`.
+- **PASS:** final clean image build completed installation and native inference;
+  `systemd-analyze verify` accepted the first-boot unit. Both `e2fsck -fn` (root)
+  and `fsck.fat -n` (boot) passed before compression. Evidence:
+  `.build/pi/build.log`, `dist/pi/verification.txt`.
+- **PASS:** independent read-only mount verification checked root/boot PARTUUIDs
+  against cmdline/fstab, exact first-boot script/unit copies, the nora cloud-init
+  default, empty machine-id and absent setup-complete marker.
+  `docker run --rm --privileged -v "$PWD:/work:ro" nora-pi-builder:trixie bash scripts/pi/verify-image.sh`
+  Evidence: `.build/pi/boot-links.log`.
+- **PASS:** final shell/config tests and workflow YAML parsing. The new Actions
+  workflow has not run on GitHub; local build evidence is distinct from CI results.
+- **PASS:** compressed archive round trip reproduces the exact 10 GiB disk image.
+  Raw image SHA-256:
+  `b9554e1f6eff926618ec0879e934a8b95732e82989563f84393fe19b1dbc0047`.
+  Compressed image SHA-256:
+  `d12d5aafb2f03f1d38a6257bbc0e88891769a2ded9daa726429a8218b8ffae39`.
+  `(cd dist/pi && shasum -a 256 -c SHA256SUMS)` reports **OK**.
+  Evidence: `dist/pi/archive-roundtrip.txt`, `dist/pi/SHA256SUMS`.
+- Built artifact: `dist/pi/nora-linux-13-raspberry-pi5-arm64.img.xz`.
+  This is a locally built prototype ready for flashing and hardware testing, not
+  a hardware-certified release. No SD card was written and no GitHub run triggered.

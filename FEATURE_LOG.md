@@ -149,3 +149,20 @@ microphone opt-in, regression tests, CI test dependencies, and operational logs
 are included together. User confirms mic-off behavior; speech-generation latency
 under emulation remains unresolved. Native Mac speech synthesis is not included.
 Final pre-commit regression: TFL-017, 115 tests passed.
+
+## Raspberry Pi 5 ARM64 image — 2026-09-16
+
+User requested a Pi 5-ready NORA image. Added an independent disk-image builder
+using checksum-pinned Raspberry Pi OS Lite ARM64 (Debian 13 Trixie), upstream Pi
+firmware/kernel, native ARM64 llama.cpp and pinned local speech wheels/models.
+Includes the existing Xfce/NORA workspace and startup music. Speech stays on;
+microphone stays off. First boot sets an account password, then starts the desktop.
+The 4 KB-page kernel is selected for native voice library compatibility. Added
+Pi setup/hardware validation guide and a manual ARM64 Actions build. Physical Pi
+boot and audio validation are pending; this does not replace the amd64 ISO.
+
+Local Pi image built successfully at
+`dist/pi/nora-linux-13-raspberry-pi5-arm64.img.xz`. Native chat and speech inference,
+first-boot account integration, boot partition references, filesystem integrity
+and compressed-image round trip passed (TFL-018). Ready for the first physical
+Pi 5 test; hardware results remain pending.
