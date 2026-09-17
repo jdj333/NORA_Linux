@@ -81,3 +81,71 @@ successful release.
 ```markdown
 | F-NNN | User request and intended behavior | State; source commit or local changes; limits | Guide and TFL IDs |
 ```
+
+## Local testing milestone — 2026-09-16
+
+User requested restarting NORA with more RAM and cores. Started the latest local
+workspace (source `0efeed2`) in an 8 GiB / 6-vCPU QEMU guest, backed by Colima with
+16 GiB / 8 CPUs. Verified the maximized workspace and offline-model-ready status
+through a fresh screenshot; opened the noVNC viewer. See **TFL-008**. Voice stays
+off by default; this browser connection does not forward physical audio. This
+local development remaster is distinct from the GitHub release build.
+
+## Audio-capable Mac VM setup — 2026-09-16
+
+User requested configuring the proposed UTM setup. Installed UTM 4.7.5 and
+prepared `dist/NORA Linux.utm` with 8 GiB / 6 CPUs and Intel HDA duplex audio.
+UTM was opened; automated start is blocked by macOS automation permission
+(error -1743). Physical audio and UTM guest boot remain unverified. See TFL-009.
+
+### UTM playback verification
+
+Following the import fix, the user confirmed startup music plays successfully
+in the UTM session (**TFL-011**). Speaker playback is now user-verified;
+microphone input and synthesized voice replies remain unverified.
+
+## Chat performance tuning — 2026-09-16
+
+User authorized context/thread tuning and native Mac inference for development.
+Reduced system prompt size, skipped OS snapshots for simple greetings, enabled
+prompt caching, and added an opt-in host endpoint while retaining the ISO's
+built-in offline default. Benchmarked two/four native CPU threads and Metal;
+started the same model with Metal on Mac loopback. Paused the older browser VM.
+User confirmed **Host model ready** in the updated UTM workspace. All 107 Linux
+regressions pass; see TFL-012 and CHAT.md. Changes are local and not yet committed.
+
+## Voice-on startup default — 2026-09-16
+
+User requested voice be enabled by default, superseding the original off-by-default
+requirement. Implemented automatic activation after startup music completes (or
+immediately if unavailable), while retaining manual off/pause and error fallback.
+Chat changes and Settings cancel pending activation. Updated README, voice guide,
+and model capability description. All 110 Linux tests pass; see TFL-013.
+Running-VM update is staged and awaiting user application/verification.
+
+## Clear speech playback — 2026-09-16
+
+Investigated missing/garbled replies using a guest diagnostic. Confirmed repeated
+PortAudio underruns; user heard the same waveform clearly through GStreamer.
+Changed default speaker playback to that buffered path, retained explicit device
+support, and kept voice errors visible. 113 Linux tests and real model/worker
+integration pass. Fix staged for the running guest; see TFL-014/TFL-015. Emulated
+speech generation is still slow and is not accelerated by the Mac chat model.
+
+## Preloaded speech with microphone off — 2026-09-16
+
+User revised voice startup: preload speech into memory, speak chat replies, and
+keep the microphone off by default. Implemented independent Voice/Mic controls,
+background prepare command, retained speech model across replies/chat changes,
+and Stop speech without unloading. Listening requires explicit Mic on. Full Linux
+suite (115 tests) and real-worker preload/audio lifecycle checks pass. See TFL-016.
+Live-guest update staged; generation under emulation remains slow.
+
+## Commit scope following 0efeed2
+
+Chat context tuning and optional native Mac chat inference, GStreamer default
+speech playback, persistent error display, speech preloading and separate
+microphone opt-in, regression tests, CI test dependencies, and operational logs
+are included together. User confirms mic-off behavior; speech-generation latency
+under emulation remains unresolved. Native Mac speech synthesis is not included.
+Final pre-commit regression: TFL-017, 115 tests passed.

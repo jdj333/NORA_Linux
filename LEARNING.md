@@ -584,3 +584,92 @@ artifact-specific results in `VALIDATION.md` and reusable lessons here.
 - GTK chat-list refresh emits selection signals. Disable voice only after the
   existing same-chat/restoring guards in `select_chat`, or autosave/title updates
   inadvertently turn voice off during a conversation.
+
+## Larger local VM allocation (2026-09-16)
+
+- This Mac reports 32 GiB RAM and 10 logical CPUs. The previous Colima limit was
+  about 2 GiB / 2 CPUs. With only idle NORA containers running, stop Colima and
+  restart with `colima start --cpu 8 --memory 16`; verify using
+  `docker info --format '{{.MemTotal}} {{.NCPU}}'`. Restart retained containers
+  afterward. Processes launched using `docker exec -d` must also be relaunched.
+- NORA's interactive QEMU guest now uses `-m 8192 -smp 6 -accel tcg,thread=multi`.
+  Confirm with QMP `query-memory-size-summary` and `query-cpus-fast`. More guest
+  resources do not remove amd64-on-ARM emulation overhead.
+- The retained rootfs has a live-medium APT source pointing at
+  `file:/run/live/medium`. Outside the booted guest, `apt-get update` reports that
+  missing source even when the online Debian indexes refresh successfully. In
+  this run, installing the required packages using those indexes succeeded.
+- noVNC does not forward the Mac microphone/speakers. This viewer is suitable for
+  workspace testing, but physical voice testing requires an audio-capable VM
+  connection or native hardware. A visible Voice button is not an audio test.
+- Local development image: `nora-desktop:/test/nora-voice-dev.iso`, based on the
+  retained Debian rootfs plus the 0efeed2 application overlay and pinned speech
+  runtime. It is separate from the GitHub clean-build release artifact.
+
+## UTM setup lessons
+
+- `brew install --cask utm` installs both UTM and `utmctl`. UTM 4.7.5 accepts
+  configuration version 4 bundles containing `config.plist` and `Data/`.
+- Intel HDA with UTM's default audio backend generates SPICE `hda-duplex`;
+  the CoreAudio selection uses output-only audio. Official reference:
+  https://docs.getutm.app/preferences/macos/ .
+- `utmctl` uses Apple Events. Error -1743 means macOS has not allowed automation;
+  a successful `open -a UTM` is not proof the bundle was imported or started.
+  Have the user grant the macOS prompt or use UTM's native Play button. Do not
+  report physical audio working until playback and input are actually checked.
+- UTM drive interface values are case-sensitive **`IDE`**, `VirtIO`, etc., even
+  though QEMU command-line interfaces use lowercase. `plutil -lint` checks plist
+  syntax only. Validate enum values against the installed release's source;
+  testing against upstream `main` alone does not establish compatibility.
+
+## Native Mac inference while testing an emulated guest
+
+- Adding vCPUs does not remove amd64-on-ARM inference overhead. Benchmark the
+  same GGUF natively before changing models. On this Mac, Metal with two threads
+  beat four slightly; native CPU preferred four. See TFL-012 for exact results.
+- `scripts/start-mac-model.sh` binds only 127.0.0.1:8089. UTM user networking can
+  reach it at 10.0.2.2:8089; the user confirmed Host model ready. Environment
+  overrides NORA_MODEL_HOST/NORA_MODEL_PORT apply to both health and streaming.
+- Keep guest OS measurements and command execution in the guest when inference
+  runs on the host. Voice inference is a separate pipeline and remains emulated.
+- Pause the unused Docker guest with `docker exec nora-desktop python3
+  /test/qmp.py /test/qmp.sock stop`; QMP `cont` resumes without discarding RAM.
+- Copy tests with their expected repository layout, including scripts/package-release.py.
+  A missing helper in a temporary test directory is a harness failure, not a
+  product regression. The complete Linux suite uses xvfb-run for GTK tests.
+
+## Voice default revised
+
+- The user subsequently requested voice-on by default. App activation now enables
+  voice after startup music ends, avoiding transcription of its own song. Earlier
+  off-by-default notes describe the prior behavior. VoiceSession construction
+  remains inert; the application lifecycle starts it.
+- Consume startup completion callbacks once and cancel pending auto-activation
+  on manual toggle, chat changes, Settings, and close. Test the queued callback
+  after window destruction; audio cleanup must not restart a speech worker.
+
+## UTM speech underruns
+
+- Do not assume fast/choppy speech is a synthesis-speed or rate mismatch. Capture
+  source and stream rates, expected duration, actual duration, and underruns.
+  This guest reported matched 24 kHz rates but many PortAudio underruns; a 1.323 s
+  clip drained in 0.337 s. GStreamer played the identical clip clearly (1.72 s).
+- Default speech now uses GStreamer as startup music does. Keep synthesized WAV
+  headers correct; clean temporary files, stop playback before mic resume, and
+  drive visual levels from actual playback position. Explicit PortAudio devices
+  are a different path: use System default for the UTM workaround.
+- Callback tests without a real audio clock missed this fault. Include a real
+  GStreamer sync=true fakesink test to validate duration and cancellation, plus
+  physical guest playback. Synthetic model inference timing is a separate metric.
+
+## Speech and microphone are separate preferences
+
+- Latest user requirement supersedes automatic listening: speech defaults on and
+  preloads at app activation; microphone defaults off. Never call listen merely
+  because speech preparation/playback finished. VoiceSession.listen enforces the
+  explicit microphone flag as well as the UI toggle.
+- Keep Kokoro/ONNX in the existing worker between replies. A prepare command
+  loads models without opening devices; ASR remains lazy. Stop speech uses pause
+  rather than killing/restarting the worker, preserving model memory.
+- Separate initialization latency from per-sentence inference. Preloading does
+  not address the measured ~60-second synthesis of a short chunk under emulation.

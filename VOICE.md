@@ -8,28 +8,27 @@ image-understanding abilities.
 
 ## Using voice
 
-1. Open NORA Chat. **Voice off** is the default at every launch. No speech worker
-   or microphone is opened until you enable it.
-2. In **Settings**, choose Heart or Bella (American English), a microphone, and
-   speakers, or leave the audio devices on the system defaults. Choices last for
-   this application session. Opening Settings switches voice off.
-3. Click **Voice off** to enable voice. Model loading is shown before **Listening ·
-   microphone on**. Speak normally and pause to finish your turn. Recognized words
-   enter the same conversation and canvas workflow as typed messages.
-4. NORA closes the microphone while preparing and speaking her response, then
-   resumes listening automatically. The emerald follows microphone and playback
-   amplitude; the existing animation setting also applies to voice.
-5. **Pause listening** releases the microphone. **Resume listening** starts another
-   turn. **Stop voice** interrupts synthesis/playback and returns to listening.
-   Click **Voice on** to turn the entire feature off and stop its worker immediately.
+1. Open NORA Chat. **Voice on** starts loading the speech model in the background;
+   the startup song can play meanwhile. **Mic off** is the default at every launch.
+   Loading the speech model does not open either audio device.
+2. Typed chat replies are spoken automatically. Speech stops the startup song if
+   it is still playing. The speech model stays in memory between replies.
+3. Click **Mic off** to enable listening explicitly. The speech-recognition model
+   loads on demand. NORA closes the mic while speaking and resumes listening
+   afterward only while **Mic on** remains enabled.
+4. **Stop speech** interrupts audio/generation without unloading the model.
+   **Voice on** turns spoken replies off, stops the worker, and also switches the
+   microphone off. Re-enabling voice preloads speech with the microphone still off.
+5. In **Settings**, choose Heart or Bella and audio devices. Settings and chat
+   changes stop current audio and turn the microphone off while retaining the
+   loaded speech model and the spoken-reply preference. Closing the window stops
+   the worker and releases its model memory.
 
-Voice turns take turns with NORA; talking over her does not interrupt her yet.
-Use the on-screen controls to interrupt. Full-duplex conversation and acoustic
-echo cancellation are not implemented. Startup music stops when voice is enabled.
-
-Switching chats, starting a new chat, opening Settings, or closing the window
-switches voice off. Typed messages pause listening while they are processed.
-The chat and canvas remain available when audio devices or models fail.
+No wake-word listener or background microphone is enabled by speech preloading.
+Full-duplex conversation and acoustic echo cancellation are not implemented.
+Preloading saves model setup time; it does not remove the CPU cost of generating
+new speech. On the current amd64-emulated Mac VM, generation can still take about
+a minute for a short sentence. Errors leave text chat usable and remain visible.
 
 If you already have a draft, recognized words appear as **HEARD** in the transcript
 and the draft is preserved. Voice pauses so you can finish it. Slash commands and
@@ -122,3 +121,16 @@ A browser noVNC connection does not establish that the guest has a microphone or
 speaker route; VM audio forwarding needs separate setup and testing. Current
 ISO support remains amd64, not Raspberry Pi. Native ARM-container tests do not
 establish Raspberry Pi performance or boot support.
+
+## Buffered speech playback
+
+System-default speaker output uses GStreamer, the same playback path as startup
+music. Synthesized speech is temporarily written as a correctly rate-labelled
+PCM WAV, played with the audio clock, and removed afterward. These files contain
+NORA's generated speech, never microphone recordings. Explicit device selections
+continue to use PortAudio with higher buffering; use **System default** in UTM
+for the verified playback path. The emerald follows playback position.
+
+This fixes the observed choppy output path; it does not remove speech synthesis
+latency under amd64-on-ARM emulation. A voice error now stays visible until an
+explicit retry instead of disappearing during a model health refresh.

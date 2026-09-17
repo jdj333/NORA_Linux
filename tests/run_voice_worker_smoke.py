@@ -48,6 +48,9 @@ def main():
                 log.seek(0)
                 raise AssertionError('Voice worker timeout: ' + log.read()[-3000:])
             try:
+                send('prepare', 0)
+                until('prepared', 0)
+                assert not trace.exists(), 'Preloading must not open audio devices'
                 send('listen', 1)
                 heard = until('transcript', 1)
                 assert 'idea' in heard[-1]['text'].lower(), heard[-1]

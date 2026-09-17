@@ -21,6 +21,7 @@ class VoiceTests(unittest.TestCase):
         process.stdin = io.StringIO()
         self.voice.process = process
         self.voice.enabled = True
+        self.voice.microphone_enabled = True
         return process
 
     def test_default_off_never_starts_worker(self):
@@ -29,6 +30,20 @@ class VoiceTests(unittest.TestCase):
         self.voice.listen()
         self.assertFalse(self.voice.speak('Hello'))
         self.spawn.assert_not_called()
+
+    def test_enable_preloads_without_opening_microphone(self):
+        process = Mock()
+        process.stdin = io.StringIO()
+        self.spawn.return_value = process
+        with patch('voice.ROOT') as root, patch('voice.threading.Thread'):
+            root.__truediv__.return_value.is_file.return_value = True
+            self.voice.enable()
+        self.assertFalse(self.voice.microphone_enabled)
+        self.assertIn('"action": "prepare"', process.stdin.getvalue())
+        self.voice.listen()
+        self.assertNotIn('"action": "listen"', process.stdin.getvalue())
+        self.voice.set_microphone(True)
+        self.assertIn('"action": "listen"', process.stdin.getvalue())
 
     def test_disable_kills_worker_and_discards_late_transcripts(self):
         process = self.live()

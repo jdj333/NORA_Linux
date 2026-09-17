@@ -69,4 +69,29 @@ sd.InputStream = Stream
 sd.OutputStream = Stream
 sd.query_devices = lambda *args: {'default_samplerate': 24000}
 sys.path.insert(0, str(Path(os.environ['NORA_CHAT_DIR'])))
+# Default speech uses buffered GStreamer; exercise its real clock with a fake sink.
+import speech_audio
+import gi
+gi.require_version('Gst', '1.0')
+from gi.repository import Gst
+Gst.init(None)
+OriginalSpeechAudio = speech_audio.SpeechAudio
+class BufferedTestSpeech(OriginalSpeechAudio):
+    def __init__(self, samples, rate):
+        sink = Gst.ElementFactory.make('fakesink')
+        sink.set_property('sync', True)
+        super().__init__(samples, rate, sink)
+        self.traced_open = False
+    def start(self):
+        with open(os.environ['NORA_TEST_TRACE'], 'a') as output:
+            output.write('output open\n')
+        self.traced_open = True
+        super().start()
+    def close(self):
+        super().close()
+        if getattr(self, 'traced_open', False):
+            with open(os.environ['NORA_TEST_TRACE'], 'a') as output:
+                output.write('output close\n')
+            self.traced_open = False
+speech_audio.SpeechAudio = BufferedTestSpeech
 runpy.run_path(str(Path(os.environ['NORA_CHAT_DIR']) / 'voice_worker.py'), run_name='__main__')

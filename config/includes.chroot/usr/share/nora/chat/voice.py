@@ -19,6 +19,7 @@ class VoiceSession:
         self.popen = popen
         self.process = None
         self.enabled = False
+        self.microphone_enabled = False
         self.turn = 0
         self.state = 'off'
         self.input_device = None
@@ -37,7 +38,7 @@ class VoiceSession:
         self.enabled = True
         self.state = 'loading'
         threading.Thread(target=self.read, args=(self.process,), daemon=True).start()
-        self.listen()
+        self.command('prepare')
 
     def read(self, process):
         try:
@@ -63,7 +64,7 @@ class VoiceSession:
             self.state = event['state']
         elif kind == 'transcript':
             self.state = 'waiting'
-        elif kind in ('done', 'idle'):
+        elif kind in ('done', 'idle', 'prepared'):
             self.state = 'waiting'
         self.callback(event)
         return False
@@ -85,8 +86,15 @@ class VoiceSession:
             self.disable()
             self.callback({'event': 'error', 'message': 'Local voice connection stopped. Enable voice to retry.'})
 
+    def set_microphone(self, enabled):
+        self.microphone_enabled = bool(enabled) and self.enabled
+        if self.microphone_enabled:
+            self.listen()
+        else:
+            self.pause()
+
     def listen(self):
-        if self.enabled:
+        if self.enabled and self.microphone_enabled:
             self.state = 'loading'
             self.command('listen', input=self.input_device)
 
@@ -105,6 +113,7 @@ class VoiceSession:
 
     def disable(self):
         self.enabled = False
+        self.microphone_enabled = False
         self.state = 'off'
         self.turn += 1
         process, self.process = self.process, None

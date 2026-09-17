@@ -260,3 +260,225 @@ This checks local file targets, not HTTP reachability or rendered heading anchor
 - Confirming rerun:
 - Remaining limits / next check:
 ```
+
+### TFL-008 — Larger VM and latest workspace startup
+
+- **2026-09-16**, source **0efeed2**, clean before this run; only documentation
+  changed afterward. Local development remaster of the retained Debian rootfs,
+  latest `config/includes.chroot`, startup music, and the pinned amd64 speech
+  runtime from `nora-builder:voice`. This is not the GitHub release ISO.
+- Artifact: `nora-desktop:/test/nora-voice-dev.iso`, SHA-256
+  `48516162125cea552dfd74c629f30ec0e03b8cf5b10bd87fd490152fb790035c`.
+- **BLOCKED initially:** sandbox denied `sysctl` and Docker socket inspection.
+  Authorized elevated inspection succeeded: host 32 GiB / 10 logical CPUs.
+- **FAIL, then PASS:** chroot `apt-get update` reported its absent live-medium
+  file source. Online indexes refreshed; `chroot /test/rootfs apt-get install
+  -y libportaudio2 libasound2-plugins espeak-ng python3-cairo python3-gi-cairo`
+  then exited 0. Logs: `nora-boot-test:/test/voice-apt.log` and
+  `/test/voice-install.log`.
+- **PASS:** `colima stop` then `colima start --cpu 8 --memory 16`;
+  `docker info --format '{{.MemTotal}} {{.NCPU}}'` returned 16733589504 bytes / 8.
+- **PASS:** QEMU `-m 8192 -smp 6 -accel tcg,thread=multi`;
+  `python3 /test/qmp.py /test/qmp.sock query-memory-size-summary` returned
+  8589934592 bytes; `query-cpus-fast` returned six virtual CPUs.
+- An early QMP connection while the ISO was still copying was refused. After
+  transfer and QEMU launch completed, `query-status` returned running.
+- **PASS:** noVNC HTTP page, complete RFB 3.8 authentication and framebuffer
+  initialization (1280x800), and fresh QMP screenshot showing the maximized NORA
+  workspace, canvas, emerald, **Voice off**, and **Offline model ready**.
+  Screenshot: `nora-desktop:/test/voice-desktop.ppm`. Opened the browser at
+  `http://127.0.0.1:6080/vnc.html?autoconnect=true&resize=scale`.
+- **NOT RUN:** new conversational inference or full regression suite in this
+  guest. Physical audio is unavailable through this noVNC setup; voice quality,
+  microphone forwarding, and speaker output are not validated. The GitHub build
+  was still in progress when checked; no release-success claim is made.
+
+### TFL-009 — UTM audio-capable VM setup
+
+- **2026-09-16:** User authorized setting up UTM for speaker/microphone support.
+- **PASS:** `brew install --cask utm` installed UTM 4.7.5 in `/Applications`.
+- Created ignored local bundle `dist/NORA Linux.utm` with the TFL-008 ISO,
+  8192 MiB RAM, six x86_64 CPUs, Q35, Intel HDA duplex audio, emulated networking,
+  and a native display. No host directory sharing is configured.
+- **PASS:** `plutil -lint 'dist/NORA Linux.utm/config.plist'` reported OK.
+  `open -a UTM 'dist/NORA Linux.utm'` launched UTM.
+- **BLOCKED:** `utmctl list` returned macOS Apple Events error -1743 (automation
+  permission denied); `utmctl start` could not resolve the VM. This does not
+  establish that the UI import completed. User was asked to allow automation.
+- **NOT RUN:** UTM guest boot, physical speaker playback, microphone permission,
+  and voice conversation. The original Docker/browser VM was preserved.
+
+### TFL-010 — Correct UTM bundle import failure
+
+- User screenshot confirmed UTM rejected the TFL-009 bundle. That earlier plist
+  syntax check did **not** establish that UTM could decode the configuration.
+- **Confirmed cause:** `Drive[0].Interface` was `ide`; UTM v4.7.5's
+  `QEMUDriveInterface` enum requires the case-sensitive string `IDE`.
+- Corrected `dist/NORA Linux.utm/config.plist` and reopened the absolute bundle
+  path with `open -a UTM`. Verified 10 configured enum values against official
+  v4.7.5 source and verified the bundled ISO exists: **PASS**.
+- `utmctl list` still returned Apple Events permission error -1743. Actual import,
+  boot, and speaker/microphone behavior remain awaiting UI confirmation.
+
+### TFL-011 — User confirms startup music playback
+
+- **2026-09-16**, following the UTM import correction in TFL-010.
+- **PASS (user-observed):** User reported "Music startup verified works" in the
+  UTM testing session. This confirms startup music playback through the VM's
+  speaker output. No new automated command or audio recording was used.
+- **NOT VERIFIED:** Microphone capture, speech recognition, synthesized NORA
+  replies, or a complete voice conversation. Music playback alone does not
+  establish these paths work.
+
+### TFL-012 — Native Mac inference and chat context tuning
+
+- **2026-09-16:** Source `0efeed2` plus local tuning changes. Paused the redundant
+  Docker QEMU guest with QMP `stop`, preserving its live state. UTM stays active.
+- Installed Homebrew llama.cpp 0.4.1. Ran:
+  `llama-bench -m config/includes.chroot/opt/nora/llm/model.gguf -p 256 -n 64 -t 2,4 -ngl 0,99 -r 2 -o json`.
+  Evidence: `.build/utm/native-bench.json`. Native CPU generation: 83.23 t/s at
+  two threads, 126.26 at four. Metal: 193.16 at two, 180.56 at four. Selected two
+  threads with Metal; no claim that more emulated vCPUs yield the same benefit.
+- Started `scripts/start-mac-model.sh`; `/health` returned `{"status":"ok"}`.
+  Loopback-only port 8089. Same bundled GGUF; no external model API.
+- Compact system prompt: 1580 -> 971 characters. Social-only greetings omit fresh
+  OS measurements; substantive questions retain them. Explicit prompt caching
+  enabled. Production endpoint stays guest localhost; optional environment
+  variables configure host inference for development.
+- Actual host streaming Hello trials: tuned first token 0.060 / 0.011 seconds,
+  complete reply 0.108 / 0.057 seconds. Original-prompt trials 0.090 / 0.058 seconds
+  total. These short cached trials do not demonstrate a prompt-only speedup;
+  the main expected gain is native inference. No timed UTM baseline was captured.
+  Evidence: `.build/utm/chat-bench.json`. Initial benchmark harness failed on a
+  null content delta; treating it as empty fixed the harness. App already handles
+  null deltas.
+- **BLOCKED then PASS:** sandbox loopback binding prevented initial transport
+  test. Elevated host suite: 107 tests, 29 GTK tests skipped on macOS.
+- **FAIL then PASS:** first Linux copy omitted the scripts directory required by
+  the packaging test. Repeated with correct repository layout and package script:
+  `docker exec -w /tmp/nora-tuning nora-desktop xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -v`.
+  **107 tests passed, none skipped.** Evidence: `.build/utm/linux-tuning-tests.log`.
+- User ran the scoped local updater inside UTM and confirmed **Host model ready**.
+  Updated app/client and user autostart in the live guest; backups in the printed
+  `/tmp/nora-model-update.*` directory. Guest speech remains emulated. Subjective
+  end-to-end voice speed and a timed guest chat response are not yet measured.
+
+### TFL-013 — Voice enabled automatically after startup music
+
+- User changed the requested default from opt-in/off to voice-on at startup.
+- New app windows queue automatic voice activation when startup music ends or
+  is unavailable. Manual activation stops music and cancels the queued default.
+  Explicit voice-off paths, chat changes, Settings, and window close prevent a
+  pending callback from unexpectedly restarting voice. Missing audio/model
+  errors retain the existing voice-off fallback and working text chat.
+- Added GTK checks for exactly-once startup activation, cancellation on New chat,
+  and cancellation on close. VoiceSession itself remains inert until explicitly
+  enabled by the app lifecycle.
+- **PASS:** `docker exec -w /tmp/nora-tuning nora-desktop xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -v`:
+  **110 tests, all passed.** Log: `.build/utm/voice-default-tests.log`.
+- Staged scoped loopback updater including app.py, client.py, startup_audio.py.
+  User was given the command to apply it in the running UTM guest; physical
+  auto-listening after the song has not yet been confirmed.
+
+### TFL-014 — Missing spoken chat replies investigation (in progress)
+
+- User reports chat transitions from Thinking to Ready without audible speech.
+  Startup music previously worked. UTM process confirms Intel HDA duplex routed
+  to SPICE, but this does not prove that the speech worker reaches playback.
+- **Confirmed diagnostics defect:** voice errors disabled voice and set an error
+  message, but the next model health callback overwrote it with the normal ready
+  status. Added a retained voice error cleared on explicit retry.
+- **PASS:** Linux GTK regression suite, including error persistence across a
+  model health refresh: **33 tests passed**. Log:
+  `.build/voice-diagnostics/gtk-tests.log`. Fix is local, not deployed yet.
+- Prepared `.build/voice-diagnostics/check.py` for user execution in UTM. It checks
+  installed source hashes, PulseAudio sink/mute state, PortAudio device list,
+  and times a fixed synthesized sentence using the real speech worker. It never
+  opens a microphone. Reports return only to Mac loopback port 8094.
+- **Pending:** guest report and user confirmation of test playback. Do not infer
+  that emulation latency, device routing, or microphone failure is the root cause
+  before obtaining this evidence. Existing measured emulated TTS slowness is a
+  possible contributor, not a diagnosis of this session.
+
+#### TFL-014 follow-up — Intermittent, unintelligible playback
+
+- User now reports occasional speech that sounds fast and unintelligible; they
+  cannot distinguish pitch increase from missing syllables. This confirms some
+  speech reaches playback, but not that sample timing or waveform quality is correct.
+- Source inspection: Kokoro uses speed=1.0 and the returned sample rate is passed
+  to PortAudio. No confirmed sample-rate mismatch was found. The 50 ms Python
+  output callback ignores underflow status; callback starvation under emulation
+  remains a hypothesis, not a proven cause.
+- Extended the scoped guest diagnostic to generate one sentence, record sample
+  rate/count, expected duration, actual stream rate, playback wall time and
+  underflow callback count, then play the same generated waveform through
+  GStreamer (the startup-music path). Temporary synthesized audio is removed
+  afterward. No microphone recording or chat history is collected.
+- **PASS:** both diagnostic Python files compile. **PENDING:** actual guest
+  execution and listening comparison. No speed/pitch workaround was applied
+  without establishing the playback fault.
+
+### TFL-015 — Confirmed underruns and buffered speech playback fix
+
+- Guest report received at `.build/voice-diagnostics/report.json`; user heard
+  choppy attempts followed by clear final GStreamer playback.
+- Output was unmuted, PulseAudio sink 48 kHz stereo. Synthesized waveform and
+  requested/actual PortAudio stream were all 24 kHz, so no API-level rate
+  mismatch was observed. Report: 32 underflow callbacks across 43 callbacks,
+  repeated ALSA underruns, final 1.323-second waveform drained in 0.337 seconds
+  through PortAudio. Same final waveform through GStreamer: 1.72 seconds and
+  user-confirmed clear. Counters span chunks; sample count/time describe the last
+  chunk. The user-reported three choppy voices are not mapped one-to-one to events.
+- Synthesis of the final chunk took 60.45 seconds; complete diagnostic speech
+  finished after 118.81 seconds. Playback quality and synthesis delay are separate.
+- Changed system-default speech output to buffered GStreamer WAV playback, with
+  sample-rate headers, playback-position-driven emerald levels, cancellation,
+  EOS/error handling, and temporary-file cleanup. Explicit selected devices
+  retain PortAudio with high latency. Persistent voice-error display included.
+- **PASS:** full Linux suite via `/tmp/nora-voice-env/bin/python` with
+  `PYTHONPATH=/usr/lib/python3/dist-packages` and xvfb: **113 tests, no skips**.
+  Includes real clocked GStreamer/fakesink duration and cancellation tests.
+- **PASS:** real speech-worker smoke test with actual models, generated input,
+  simulated microphone, and clocked GStreamer fakesink: transcription, synthesis,
+  audio levels, no input/output overlap, and audio release on pause.
+  Logs: `.build/voice-diagnostics/playback-tests.log`, `buffered-worker-test.log`.
+- Updated CI test dependencies so buffered playback tests can run there.
+- Scoped update staged for UTM; user asked to apply it and verify a real spoken
+  chat reply. Unit/integration passes are not a claim of deployed audible success.
+
+### TFL-016 — Speech preloading, spoken chat, microphone opt-in
+
+- User requests loading speech into memory at startup, default microphone off,
+  and automatic spoken chat replies. Supersedes automatic listening at startup.
+- Worker now accepts `prepare`, initializes Kokoro/ONNX once and retains it for
+  later synthesis. Preparation never opens an input or output stream. ASR model
+  loading remains on demand. Constructor remains inert; app activation starts
+  preloading alongside startup music. Speaking or explicit mic-on stops music.
+- Separate Voice and Mic controls; `listen()` cannot run unless the mic flag is
+  explicitly enabled. Completed spoken replies resume listening only if mic-on.
+  Stop speech pauses without unloading. Settings/chat changes cancel audio and
+  mic consent, while preserving voice enablement and loaded models.
+- **PASS:** complete Linux suite **115 tests**, no skips, including startup
+  prepare-without-listen and speaking typed replies without mic activation.
+  Evidence: `.build/voice-diagnostics/preload-tests.log`.
+- **FAIL then PASS:** new integration-driver insertion initially had invalid
+  indentation. Corrected it, compiled it, then ran the real model/worker test:
+  prepare completed without any audio-device trace; STT, TTS, buffered playback,
+  amplitude events and release/pause checks passed. Evidence:
+  `.build/voice-diagnostics/preload-worker-test.log`.
+- Preloading saves initialization only. The earlier ~60-second per-chunk guest
+  synthesis cost is not claimed fixed. No model speedup is claimed from these tests.
+- Updated scoped live-guest installer to include voice.py and all playback modules.
+  User asked to apply and verify Voice on / Mic off; deployment confirmation pending.
+
+### TFL-017 — Pre-commit regression validation
+
+- Final working-tree application and tests copied to the Linux test environment.
+  `PYTHONPATH=/usr/lib/python3/dist-packages xvfb-run -a /tmp/nora-voice-env/bin/python -m unittest discover -s tests -v`
+  passed **115 tests, no skips**, in 5.331 seconds.
+  Evidence: `.build/voice-diagnostics/precommit-tests.log`.
+- `git diff --check` and `sh -n scripts/start-mac-model.sh` passed. Refreshed
+  origin/main; local HEAD and remote matched before committing.
+- User confirmed microphone is off in the updated session and reports continued
+  speech preparation delay. Native Mac speech synthesis is proposed, not
+  implemented in this revision. Preloading does not fix per-sentence emulation cost.

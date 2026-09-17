@@ -77,8 +77,9 @@ support, BIOS and UEFI boot entries, and Debian's live installer. It does not bo
 on Raspberry Pi or other ARM devices; those need a separate ARM image. Secure
 Boot and physical hardware compatibility still require testing.
 
-Interaction supports **typing and optional local voice**. Voice is off by default
-and initially supports English. The small language model can make mistakes, and it uses
+Interaction supports **typing and local voice**. Speech loads at startup and reads chat replies aloud in English.
+The microphone defaults off; enable Mic on separately to speak to NORA.
+Use the voice toggle to turn spoken replies off. The small language model can make mistakes, and it uses
 image captions and website text rather than seeing images itself.
 
 Chats are stored locally and survive application restarts. Keeping them across

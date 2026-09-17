@@ -4,8 +4,9 @@ from pathlib import Path
 
 
 class StartupAudio:
-    def __init__(self):
+    def __init__(self, on_finished=None):
         self.player = None
+        self.on_finished = on_finished
         self.bus = None
         self.handler = None
         self.finished = False
@@ -47,6 +48,7 @@ class StartupAudio:
             self.stop()
 
     def stop(self):
+        callback, self.on_finished = self.on_finished, None
         self.finished = True
         if self.bus is not None:
             self.bus.disconnect(self.handler)
@@ -56,3 +58,5 @@ class StartupAudio:
         if self.player is not None:
             self.player.set_state(self.gst.State.NULL)
             self.player = None
+        if callback is not None:
+            callback()

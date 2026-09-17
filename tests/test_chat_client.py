@@ -5,9 +5,10 @@ from pathlib import Path
 import sys
 import threading
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'config/includes.chroot/usr/share/nora/chat'))
-from client import Cancelled, ChatError, ChatRequest, context
+from client import Cancelled, ChatError, ChatRequest, context, model_endpoint, needs_os_facts
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -125,6 +126,22 @@ class ChatTests(unittest.TestCase):
         self.assertEqual(len(history), 4)
         self.assertEqual(messages[1:3], history[2:])
         self.assertEqual(messages[0]['role'], 'system')
+
+    def test_native_endpoint_is_opt_in_and_transport_uses_it(self):
+        with patch.dict('os.environ', {}, clear=True):
+            self.assertEqual(model_endpoint(), ('127.0.0.1', 8088))
+        with patch.dict('os.environ', {'NORA_MODEL_HOST': '10.0.2.2', 'NORA_MODEL_PORT': '8089'}):
+            request = ChatRequest()
+            self.assertEqual((request.connection.host, request.connection.port), ('10.0.2.2', 8089))
+        with patch.dict('os.environ', {'NORA_MODEL_PORT': '65536'}):
+            with self.assertRaises(ValueError):
+                model_endpoint()
+
+    def test_only_social_messages_skip_os_measurements(self):
+        for text in ('Hello', 'Hello Nora!', 'Thanks', 'Good morning'):
+            self.assertFalse(needs_os_facts(text))
+        for text in ('Hello, how much memory do you have?', 'What happened?', 'How are my processes?', 'Explain Linux'):
+            self.assertTrue(needs_os_facts(text))
 
     def test_input_limit_counts_utf8_bytes(self):
         with self.assertRaises(ChatError):

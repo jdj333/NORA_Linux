@@ -328,3 +328,44 @@ the service log rather than repeatedly launching more model processes.
 Upstream references: [llama.cpp release](https://github.com/ggml-org/llama.cpp/releases/tag/b10964),
 [server documentation](https://github.com/ggml-org/llama.cpp/tree/b10964/tools/server),
 [Qwen model and license](https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/tree/9217f5db79a29953eb74d5343926648285ec7e67).
+
+## Faster chat while testing an amd64 VM on Apple Silicon
+
+The amd64 guest emulates its model on an ARM Mac. For development, inference can
+instead run locally on the Mac using Metal and the same bundled GGUF. The ISO's
+normal default remains its own `127.0.0.1:8088` offline model.
+
+On the Mac, install `llama.cpp` with Homebrew, then run from the checkout:
+
+```sh
+./scripts/start-mac-model.sh
+```
+
+Keep that process running. It listens only on Mac loopback port 8089, loads the
+prepared model from this checkout, and uses no hosted API. In a QEMU/UTM guest
+with user networking, the host loopback is reachable at `10.0.2.2`:
+
+```sh
+curl -fsS http://10.0.2.2:8089/health
+NORA_MODEL_HOST=10.0.2.2 NORA_MODEL_PORT=8089 nora-terminal
+```
+
+Close the existing workspace before opening this one. A successful connection
+shows **Host model ready**. Model input includes the guest's conversation and
+selected OS/command/web/canvas context, sent to the model on the Mac. Commands
+still run in the guest; OS answers still use guest measurements. Speech
+recognition and synthesis remain in the guest and can still be slow under
+emulation. This override does not accelerate those services.
+
+For the current live test, a user autostart override was installed at
+`~/.config/autostart/nora-terminal.desktop`. To return to the built-in model,
+remove that specific override, close chat, and run `nora-terminal` without the
+variables. The override and live-session changes disappear when this
+non-persistent guest shuts down. The Mac server must be restarted after a Mac
+restart; it is not installed as a login service.
+
+Measured on the development Mac with the bundled model: Metal with two threads
+achieved about 193 generated tokens/sec in `llama-bench`, versus 83 with two
+native CPU threads and 126 with four. These are native host benchmarks, not
+Raspberry Pi performance or a measured speedup against the emulated guest.
+See TFL-012 in [TEST_FEEDBACK_LOOPS.md](TEST_FEEDBACK_LOOPS.md).

@@ -63,7 +63,7 @@ def main():
                 if len(line) > 12000:
                     raise ValueError('Voice request too large')
                 command = json.loads(line)
-                if command.get('action') not in ('listen', 'speak', 'pause'):
+                if command.get('action') not in ('prepare', 'listen', 'speak', 'pause'):
                     raise ValueError('Unknown voice action')
                 with gate:
                     current['turn'] = int(command['turn'])
@@ -80,6 +80,15 @@ def main():
     threading.Thread(target=receiver, daemon=True).start()
     asr = None
     tts = None
+    def load_tts():
+        nonlocal tts
+        if tts is None:
+            options = ort.SessionOptions()
+            options.intra_op_num_threads = 2
+            session = ort.InferenceSession(str(ROOT / 'tts/model.onnx'), sess_options=options,
+                                           providers=['CPUExecutionProvider'])
+            tts = Kokoro.from_session(session, str(ROOT / 'tts/voices.bin'))
+
     while not closed.is_set():
         try:
             command = commands.get(timeout=.1)
@@ -89,6 +98,12 @@ def main():
         alive = lambda: not closed.is_set() and current['turn'] == turn
         try:
             if command['action'] == 'pause':
+                continue
+            if command['action'] == 'prepare':
+                emit('state', turn, state='loading', message='Loading speech model · microphone off')
+                load_tts()
+                if alive():
+                    emit('prepared', turn)
                 continue
             if command['action'] == 'listen':
                 emit('state', turn, state='loading', message='Preparing local listening…')
@@ -163,12 +178,7 @@ def main():
                         emit('idle', turn)
             elif command['action'] == 'speak':
                 emit('state', turn, state='loading', message='Preparing NORA’s voice…')
-                if tts is None:
-                    options = ort.SessionOptions()
-                    options.intra_op_num_threads = 2
-                    session = ort.InferenceSession(str(ROOT / 'tts/model.onnx'), sess_options=options,
-                                                   providers=['CPUExecutionProvider'])
-                    tts = Kokoro.from_session(session, str(ROOT / 'tts/voices.bin'))
+                load_tts()
                 voice = command.get('voice', 'af_heart')
                 if voice not in ('af_heart', 'af_bella'):
                     raise ValueError('Unknown voice')
@@ -179,6 +189,27 @@ def main():
                     if not alive():
                         break
                     samples = np.asarray(samples, dtype=np.float32)
+                    if command.get('output') is None:
+                        from speech_audio import SpeechAudio
+                        try:
+                            with gate:
+                                if not alive():
+                                    continue
+                                stream = SpeechAudio(samples, rate)
+                                current['stream'] = stream
+                                stream.start()
+                            emit('state', turn, state='speaking', message='NORA is speaking · microphone off')
+                            deadline = time.monotonic() + len(samples) / rate + 15
+                            while alive() and not stream.wait():
+                                if time.monotonic() > deadline:
+                                    raise RuntimeError('Audio output stopped responding')
+                                start = min(len(samples), int(stream.position() * rate))
+                                frame = samples[start:start + max(1, rate // 20)]
+                                level = float(min(1, np.sqrt(np.mean(frame ** 2)) * 6)) if len(frame) else 0.0
+                                emit('level', turn, state='speaking', level=level)
+                        finally:
+                            close_audio()
+                        continue
                     cursor = [0]
                     energy = [0.0]
                     done = threading.Event()
@@ -200,7 +231,7 @@ def main():
                         with gate:
                             if alive():
                                 stream = sd.OutputStream(device=command.get('output'), samplerate=rate,
-                                                         channels=1, dtype='float32', blocksize=rate // 20,
+                                                         channels=1, dtype='float32', blocksize=rate // 20, latency='high',
                                                          callback=playback, finished_callback=done.set)
                                 current['stream'] = stream
                                 stream.start()

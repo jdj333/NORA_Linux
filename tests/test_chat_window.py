@@ -55,7 +55,50 @@ class WindowTests(unittest.TestCase):
         self.addCleanup(commands.stop)
         self.window.voice_button.set_active(True)
 
-    def test_voice_is_off_at_start_and_transcript_keeps_canvas(self):
+    def test_voice_failure_survives_model_health_refresh(self):
+        self.window.voice_event({'event': 'error', 'message': 'No output device'})
+        self.window.health_result(True)
+        self.assertEqual(self.window.status.get_text(), 'Voice off · No output device')
+        self.enable_test_voice()
+        self.assertIsNone(self.window.voice_error)
+
+    def test_voice_preloads_at_start_without_microphone_once(self):
+        def enable():
+            self.window.voice.enabled = True
+            self.window.voice.state = 'listening'
+        with patch.object(self.window.voice, 'enable', side_effect=enable) as start:
+            self.assertFalse(self.window.voice.enabled)
+            self.window.start_default_voice()
+            self.drain()
+            self.assertFalse(self.window.voice.microphone_enabled)
+            self.assertTrue(self.window.voice_button.get_active())
+            self.assertTrue(self.window.voice.enabled)
+            self.window.start_default_voice()
+            start.assert_called_once()
+
+    def test_typed_reply_speaks_without_enabling_microphone(self):
+        self.enable_test_voice()
+        with patch.object(self.window.voice, 'speak', return_value=True) as speak, patch.object(self.window.voice, 'listen') as listen:
+            self.window.voice_reply('Hello')
+            self.window.voice_event({'event': 'done', 'turn': self.window.voice.turn})
+            speak.assert_called_once_with('Hello')
+            listen.assert_not_called()
+        self.assertFalse(self.window.microphone_button.get_active())
+
+    def test_new_chat_cancels_pending_startup_voice(self):
+        with patch.object(self.window.voice, 'enable') as start:
+            self.window.reset_chat()
+            self.window.startup_audio.stop()
+            self.drain()
+            start.assert_not_called()
+
+    def test_closed_window_cannot_start_voice_from_music_callback(self):
+        with patch.object(self.window.voice, 'enable') as start:
+            self.window.close_window()
+            self.drain()
+            start.assert_not_called()
+
+    def test_voice_waits_for_music_and_transcript_keeps_canvas(self):
         self.assertFalse(self.window.voice.enabled)
         self.assertFalse(self.window.voice_button.get_active())
         self.enable_test_voice()
@@ -81,7 +124,8 @@ class WindowTests(unittest.TestCase):
         self.assertEqual(self.window.buffer_text(self.window.input.get_buffer()), 'My draft')
         self.assertIn('New words', self.window.buffer_text(self.window.buffer))
         self.window.clear()
-        self.assertFalse(self.window.voice.enabled)
+        self.assertTrue(self.window.voice.enabled)
+        self.assertFalse(self.window.voice.microphone_enabled)
 
     def test_voice_levels_respect_reduced_motion_and_off(self):
         self.enable_test_voice()
