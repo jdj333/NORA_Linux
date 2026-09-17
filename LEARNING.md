@@ -7,7 +7,8 @@ for the tested artifact, checksum, evidence, and outstanding tests.
 
 ## Start here to avoid repeating work
 
-1. Read the validation record and inspect the current diff before changing anything.
+1. Read [TEST_FEEDBACK_LOOPS.md](TEST_FEEDBACK_LOOPS.md), the relevant validation
+   record, and [FEATURE_LOG.md](FEATURE_LOG.md); inspect the current diff before changing anything.
 2. Recheck mutable facts cheaply: Docker availability, container state, available
    disk space, and which ISO is being tested. Do not repeat settled research.
 3. Choose the smallest necessary operation:
@@ -20,7 +21,9 @@ for the tested artifact, checksum, evidence, and outstanding tests.
    | Packages, kernel, architecture, or Debian base | Full live-build run |
 
 4. Check script syntax, paths, permissions, and hook assumptions before compression.
-5. Test the exact final ISO. A successful build is not evidence of correct branding
+5. Append regression outcomes, failures, fixes, and commands to the test feedback
+   log; update the feature log when a request is implemented or delivered.
+6. Test the exact final ISO. A successful build is not evidence of correct branding
    or a working desktop. Stop repeating checks once they pass unless inputs change.
 
 The tested `dist/` ISO was corrected and resealed after the initial full build.
@@ -557,3 +560,27 @@ These tests attach no host disk and do not validate installation.
 When extending these notes, record the symptom, confirmed cause or clearly labeled
 hypothesis, smallest working fix, reusable command, and verification limit. Keep
 artifact-specific results in `VALIDATION.md` and reusable lessons here.
+
+## Local voice integration
+
+- NORA voice is opt-in per application session. Keep model imports/audio handles in
+  `voice_worker.py`, never GTK startup. `VoiceSession` invalidates turn IDs and
+  kills the worker on disable so stale transcripts cannot submit after mic-off.
+- Moonshine Voice 0.1.5 supports `Transcriber(path, ModelArch.SMALL_STREAMING)`.
+  `num_threads` is **not** a supported transcriber option in this version; passing
+  it fails model loading. Use a new stream per listening turn and close it after
+  `stop()` (which can flush a final transcript).
+- Pin the English streaming model's complete ORT directory, including frontend
+  weights and tokenizer, not just the encoder/decoder. Official downloads worked
+  with a `NORA-Linux/1.0` User-Agent; bounded retries handle transient HTTP errors.
+  Run `python3 scripts/prepare-voice.py --verify-only` to check the staged assets.
+- For Kokoro, use `Kokoro.from_session` with an explicitly CPU-only ONNX session;
+  the constructor otherwise chooses its own session settings. `af_heart` and
+  `af_bella` work with the pinned v1.0 INT8 model and `voices-v1.0.bin`.
+- `scripts/verify-voice.py` checks both voices, recognition, and silence without
+  opening audio devices. `tests/run_voice_worker_smoke.py` uses the real worker
+  and models with simulated devices; see its environment variables and harness.
+  These checks do not establish physical microphone quality or VM forwarding.
+- GTK chat-list refresh emits selection signals. Disable voice only after the
+  existing same-chat/restoring guards in `select_chat`, or autosave/title updates
+  inadvertently turn voice off during a conversation.

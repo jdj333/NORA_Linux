@@ -3,8 +3,9 @@ import math
 
 LABELS = {'ready': 'Ready', 'loading': 'Model starting', 'thinking': 'Thinking…',
           'replying': 'Replying…', 'reading': 'Reading a website…',
-          'command': 'Running a command…', 'stopping': 'Stopping…'}
-ACTIVE = frozenset({'thinking', 'replying', 'reading', 'command', 'stopping'})
+          'command': 'Running a command…', 'stopping': 'Stopping…',
+          'listening': 'Listening · microphone on', 'speaking': 'Speaking · microphone off'}
+ACTIVE = frozenset({'thinking', 'replying', 'reading', 'command', 'stopping', 'listening', 'speaking'})
 
 
 def intensity(state, elapsed, since_chunk=None, animate=True):

@@ -27,6 +27,9 @@ gir1.2-gstreamer-1.0
 gstreamer1.0-plugins-base
 gstreamer1.0-plugins-good
 gstreamer1.0-libav
+libportaudio2
+libasound2-plugins
+espeak-ng
 libgomp1
 procps
 iproute2

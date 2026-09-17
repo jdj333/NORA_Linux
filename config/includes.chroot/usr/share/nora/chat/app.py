@@ -21,6 +21,7 @@ from web_access import normalize_url
 from image_search import ImageSearchRequest, search_target
 from startup_audio import StartupAudio
 from canvas_intent import action as canvas_action, example as canvas_example
+from voice import VoiceSession, devices as voice_devices
 
 from style import CSS, COLORS
 
@@ -37,6 +38,7 @@ class Terminal(Gtk.ApplicationWindow):
         self.request = None
         self.closed = False
         self.startup_audio = StartupAudio()
+        self.voice = VoiceSession(GLib.idle_add, self.voice_event)
         self.probing = False
         self.model_ready = False
         self.store = None
@@ -54,6 +56,14 @@ class Terminal(Gtk.ApplicationWindow):
         self.settings_button = Gtk.Button(label='Settings')
         self.settings_button.connect('clicked', self.open_settings)
         header.pack_end(self.settings_button)
+        self.voice_button = Gtk.ToggleButton(label='Voice off')
+        self.voice_button.set_tooltip_text('Enable local listening and spoken replies for this session')
+        self.voice_button.connect('toggled', self.toggle_voice)
+        header.pack_end(self.voice_button)
+        self.voice_control = Gtk.Button(label='Resume listening')
+        self.voice_control.set_no_show_all(True)
+        self.voice_control.connect('clicked', self.control_voice)
+        header.pack_end(self.voice_control)
         layout = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL)
         self.add(layout)
         sidebar = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
@@ -170,6 +180,137 @@ class Terminal(Gtk.ApplicationWindow):
         self.poll()
         self.poll_source = GLib.timeout_add_seconds(3, self.poll)
 
+    def toggle_voice(self, button):
+        if button.get_active():
+            if self.request:
+                button.set_active(False)
+                self.status.set_text('Finish the current operation before enabling voice.')
+                return
+            self.startup_audio.stop()
+            try:
+                self.voice.enable()
+            except (OSError, RuntimeError) as error:
+                button.set_active(False)
+                self.status.set_text(str(error))
+                return
+            if not self.voice.enabled:
+                button.set_active(False)
+                return
+            button.set_label('Voice on')
+            self.voice_control.show()
+            self.status.set_text('Preparing local voice · microphone opens only while listening')
+        else:
+            self.voice.disable()
+            button.set_label('Voice off')
+            self.voice_control.hide()
+            if not self.closed:
+                self.idle_status()
+
+    def control_voice(self, *_):
+        if self.voice.state in ('speaking', 'loading'):
+            # Reclaim a device even if native synthesis/loading is still busy.
+            self.voice.disable()
+            try:
+                self.voice.enable()
+                if self.request:
+                    self.voice.pause()
+            except (OSError, RuntimeError) as error:
+                self.voice_button.set_active(False)
+                self.status.set_text(str(error))
+        elif self.voice.state == 'listening':
+            self.voice.pause()
+            self.voice_control.set_label('Resume listening')
+            self.status.set_text('Voice paused · microphone off')
+            self.presence.set_activity('ready')
+        elif not self.request:
+            self.voice.listen()
+        else:
+            self.status.set_text('NORA will listen after this operation finishes.')
+
+    def voice_event(self, event):
+        if self.closed:
+            return
+        kind = event['event']
+        if kind == 'error':
+            self.voice_button.set_active(False)
+            self.status.set_text('Voice off · ' + event['message'])
+        elif kind == 'state':
+            state = event['state']
+            self.voice_control.set_label('Pause listening' if state == 'listening' else 'Stop voice')
+            self.status.set_text(event['message'])
+            if state in ('listening', 'speaking'):
+                self.presence.audio_activity(state)
+            elif not self.request:
+                self.presence.set_activity('thinking')
+        elif kind == 'level':
+            self.presence.audio_activity(event['state'], event['level'])
+        elif kind == 'partial':
+            self.status.set_text('Hearing: ' + event['text'][:140])
+        elif kind == 'transcript':
+            text = event['text'].strip()
+            self.voice.pause()
+            self.voice_control.set_label('Resume listening')
+            if self.request or self.buffer_text(self.input.get_buffer()).strip():
+                self.append('HEARD > ' + text + '\n[Your current draft was kept.]\n\n', 'note')
+                self.status.set_text('Voice paused · finish your draft, then resume listening')
+                return
+            self.input.get_buffer().set_text(text)
+            self.send(from_voice=True)
+        elif kind in ('done', 'idle'):
+            if not self.request:
+                self.voice.listen()
+
+    def voice_reply(self, answer):
+        if self.voice.enabled:
+            self.voice_control.set_label('Stop voice')
+            self.status.set_text('Preparing NORA’s voice · microphone off')
+            if not self.voice.speak(answer):
+                self.voice.listen()
+
+    def voice_settings(self, content):
+        label = Gtk.Label(label='Voice is local and off at every startup. No audio recordings are saved.\n'
+                          'Listening pauses while NORA replies. Spoken commands require review.', xalign=0)
+        label.set_line_wrap(True)
+        content.add(label)
+        voice = Gtk.ComboBoxText()
+        voice.append('af_heart', 'Heart · American English')
+        voice.append('af_bella', 'Bella · American English')
+        voice.set_active_id(self.voice.voice)
+        voice.connect('changed', lambda box: setattr(self.voice, 'voice', box.get_active_id()))
+        content.add(voice)
+        inputs, outputs = Gtk.ComboBoxText(), Gtk.ComboBoxText()
+        for box, title in ((inputs, 'Microphone · system default'), (outputs, 'Speakers · system default')):
+            box.append('default', title)
+            box.set_active_id('default')
+            content.add(box)
+        hint = Gtk.Label(label='Loading audio devices…', xalign=0)
+        content.add(hint)
+        alive = [True]
+        content.connect('destroy', lambda *_: alive.__setitem__(0, False))
+        def populate(found, error):
+            if not alive[0]:
+                return False
+            for device in found:
+                for box, key in ((inputs, 'input'), (outputs, 'output')):
+                    if device[key]:
+                        box.append(str(device['id']), device['name'])
+            for box, attr in ((inputs, 'input_device'), (outputs, 'output_device')):
+                value = getattr(self.voice, attr)
+                box.set_active_id(str(value) if value is not None else 'default')
+                def select(combo, name=attr):
+                    selected = combo.get_active_id()
+                    setattr(self.voice, name, None if selected in (None, 'default') else int(selected))
+                box.connect('changed', select)
+            hint.set_text(error or 'Device and voice choices apply to this application session.')
+            return False
+        def worker():
+            try:
+                found = voice_devices()
+                GLib.idle_add(populate, found, None)
+            except Exception as error:
+                GLib.idle_add(populate, [], 'Audio devices unavailable: ' + str(error)[:140])
+        threading.Thread(target=worker, daemon=True).start()
+
     def window_state(self, _window, event):
         self.presence.set_paused(bool(event.new_window_state & Gdk.WindowState.ICONIFIED))
         return False
@@ -279,6 +420,7 @@ class Terminal(Gtk.ApplicationWindow):
     def select_chat(self, _list, row):
         if self.restoring or self.request or row is None or row.chat_id == self.chat_id:
             return
+        self.voice_button.set_active(False)
         chat_id = row.chat_id
         if not self.persist_chat():
             return
@@ -294,6 +436,7 @@ class Terminal(Gtk.ApplicationWindow):
             self.chat_title = ' '.join(prompt.split())[:70] or 'New chat'
 
     def reset_chat(self):
+        self.voice_button.set_active(False)
         self.restoring = True
         self.chat_id, self.chat_title = uuid.uuid4().hex, 'New chat'
         self.history = []
@@ -312,11 +455,13 @@ class Terminal(Gtk.ApplicationWindow):
         self.persist_chat()
 
     def open_settings(self, *_):
+        self.voice_button.set_active(False)
         dialog = Gtk.Dialog(title='NORA Settings', transient_for=self, modal=True)
         dialog.add_button('Close', Gtk.ResponseType.CLOSE)
         content = dialog.get_content_area()
         content.set_border_width(20)
         content.set_spacing(16)
+        self.voice_settings(content)
         animation = Gtk.CheckButton(label='Animate NORA and the canvas')
         animation.set_active(self.presence.animate)
         animation.connect('toggled', self.change_animation)
@@ -514,9 +659,11 @@ class Terminal(Gtk.ApplicationWindow):
 
     def idle_status(self):
         if not self.request:
-            self.presence.set_activity('ready' if self.model_ready else 'loading')
+            if not self.voice.enabled or self.voice.state == 'waiting':
+                self.presence.set_activity('ready' if self.model_ready else 'loading')
         model = 'Offline model ready' if self.model_ready else 'Model starting; system questions and commands are ready'
-        self.status.set_text(f'● {model}')
+        if not self.voice.enabled:
+            self.status.set_text(f'● {model}')
         self.directory.set_text(self.cwd)
         self.chat_list.set_sensitive(not self.request)
         self.settings_button.set_sensitive(not self.request)
@@ -575,7 +722,10 @@ class Terminal(Gtk.ApplicationWindow):
         self.input.get_buffer().set_text('')
         self.schedule_save()
 
+        self.voice_reply(answer)
+
     def busy(self, request, label):
+        self.voice.pause()
         self.request = request
         self.presence.set_activity('command' if isinstance(request, CommandRequest) else
                                    'reading' if isinstance(request, WebRequest) else 'thinking')
@@ -675,6 +825,10 @@ class Terminal(Gtk.ApplicationWindow):
         self.idle_status()
         self.schedule_save()
         (self.command_input if self.command_from_terminal else self.input).grab_focus()
+        if self.voice.enabled:
+            self.voice_reply('Command stopped.' if request.cancelled.is_set() else
+                             'The command failed. See the terminal for details.' if error else
+                             'The command has finished. Its output is in the terminal.')
         return False
 
     def read_website(self, url, prompt, request_type=WebRequest):
@@ -725,14 +879,22 @@ class Terminal(Gtk.ApplicationWindow):
         self.idle_status()
         self.schedule_save()
         self.input.grab_focus()
+        if self.voice.enabled:
+            self.voice_reply('Website read stopped.' if request.cancelled.is_set() else
+                             'I could not read that page. The details are in chat.' if error else
+                             'I read the page. Ask me to summarize it or ask a follow-up question.')
         return False
 
-    def send(self, *_):
+    def send(self, *_, from_voice=False):
         if self.request:
             return
         buffer = self.input.get_buffer()
         prompt = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False).strip()
         if not prompt:
+            return
+        self.voice.pause()
+        if from_voice and (prompt.startswith('/') or canvas_action(prompt) == 'clear'):
+            self.status.set_text('Voice paused · review the recognized action and press Send')
             return
         gesture = canvas_action(prompt)
         if gesture:
@@ -827,7 +989,7 @@ class Terminal(Gtk.ApplicationWindow):
             answer, source = system_answer(facts, selected)
             self.exchange(prompt, answer, source)
             return
-        inspection = inspection_command(prompt)
+        inspection = None if from_voice else inspection_command(prompt)
         if inspection:
             self.start_command(inspection, prompt)
             return
@@ -901,6 +1063,10 @@ class Terminal(Gtk.ApplicationWindow):
         self.idle_status()
         self.schedule_save()
         self.input.grab_focus()
+        if not error and not request.cancelled.is_set():
+            self.voice_reply(answer)
+        elif self.voice.enabled:
+            self.voice.listen()
         return False
 
     def stop(self, *_):
@@ -928,6 +1094,7 @@ class Terminal(Gtk.ApplicationWindow):
         if self.store and not self.persist_chat():
             return True
         self.closed = True
+        self.voice.disable()
         self.startup_audio.stop()
         self.presence.shutdown()
         self.canvas.shutdown()

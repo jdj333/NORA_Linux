@@ -21,7 +21,9 @@ both an answer and what happens on your computer.
 **[Visit noralinux.com](https://noralinux.com/)** ·
 [Meet NORA](https://noralinux.com/meet-nora/) ·
 [Download a prerelease](https://github.com/jdj333/NORA_Linux/releases) ·
-[Chat guide](CHAT.md)
+[Chat guide](CHAT.md) ·
+[Feature history](FEATURE_LOG.md) ·
+[Test feedback loops](TEST_FEEDBACK_LOOPS.md)
 
 ## One workspace for conversation, ideas, and action
 
@@ -48,6 +50,9 @@ the desktop's default audio output. Closing the window stops the music.
 - **Saved conversations:** return to chats in the left sidebar, with their own
   drafts, context, terminal output, and canvas. Settings includes
   **Clear all history and contexts**.
+- **Optional local voice:** enable the Voice toggle to listen and speak with
+  Moonshine and Kokoro. Voice and microphone access start off; speech stays on
+  this computer. See [VOICE.md](VOICE.md) for controls and audio setup.
 - **An emerald with expression:** NORA smiles when ready, gently pulses while
   processing, and reacts to incoming reply text. Animation can be disabled.
 
@@ -72,9 +77,8 @@ support, BIOS and UEFI boot entries, and Debian's live installer. It does not bo
 on Raspberry Pi or other ARM devices; those need a separate ARM image. Secure
 Boot and physical hardware compatibility still require testing.
 
-Interaction is currently **typed**. Local listening and speech are being
-researched and are not implemented; the planned voice mode will be off by
-default. The small language model can make mistakes, and the current model uses
+Interaction supports **typing and optional local voice**. Voice is off by default
+and initially supports English. The small language model can make mistakes, and it uses
 image captions and website text rather than seeing images itself.
 
 Chats are stored locally and survive application restarts. Keeping them across
@@ -129,6 +133,10 @@ sudo apt-get install live-build debootstrap ca-certificates xorriso isolinux \
   syslinux-common grub-pc-bin grub-efi-amd64-bin mtools dosfstools squashfs-tools \
   file rsync xz-utils zstd bzip2 python3
 python3 scripts/prepare-llm.py
+python3 scripts/prepare-voice.py
+sudo apt-get install python3-pip
+python3 -m pip install --only-binary=:all: --require-hashes \
+  --target config/includes.chroot/opt/nora/voice/python -r scripts/voice-requirements.txt
 sudo ./scripts/build.sh
 ```
 
@@ -143,6 +151,7 @@ preferable. No host filesystem is mounted into this privileged container.
 
 ```sh
 python3 scripts/prepare-llm.py
+python3 scripts/prepare-voice.py
 docker build --platform linux/amd64 -t nora-builder:trixie .
 docker run --name nora-iso-build --platform linux/amd64 --privileged nora-builder:trixie
 mkdir -p dist
@@ -156,6 +165,7 @@ and `SHA256SUMS`. Mirror contents change, so builds are not byte-reproducible.
 Preparing the LLM requires Python 3.12+ and downloads about 508 MB from the
 official upstream projects. Downloads are checksum-pinned and cached in `.build/`.
 Generated runtime/model files are included in the image but ignored by Git.
+Voice adds about 251 MiB of model assets plus its runtime; see [VOICE.md](VOICE.md).
 
 ## Validation before release
 

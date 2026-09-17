@@ -12,13 +12,15 @@ from presence_model import ACTIVE, LABELS, intensity
 class EmeraldPresence(Gtk.Box):
     EXPRESSIONS = {'ready': 'smiling', 'loading': 'resting',
                    'thinking': 'curious', 'replying': 'expressive smile',
-                   'reading': 'curious', 'command': 'focused', 'stopping': 'resting'}
+                   'reading': 'curious', 'command': 'focused', 'stopping': 'resting',
+                   'listening': 'attentive', 'speaking': 'speaking smile'}
 
     def __init__(self):
         super().__init__(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.state = 'loading'
         self.started = time.monotonic()
         self.last_chunk = None
+        self.audio_level = 0.0
         self.settle_at = None
         self.animate = True
         self.paused = False
@@ -50,7 +52,7 @@ class EmeraldPresence(Gtk.Box):
     def update_accessibility(self):
         self.area.get_accessible().set_name(
             'NORA emerald: ' + LABELS[self.state] + ' (' + self.EXPRESSIONS[self.state] + ')')
-        self.area.set_tooltip_text('NORA · ' + LABELS[self.state] + '\nGlow follows activity and incoming reply text.')
+        self.area.set_tooltip_text('NORA · ' + LABELS[self.state] + '\nGlow follows activity, reply text, and voice audio levels.')
 
     def motion_enabled(self):
         return self.animate and self.settings.get_property('gtk-enable-animations')
@@ -80,6 +82,11 @@ class EmeraldPresence(Gtk.Box):
     def reply_chunk(self):
         self.set_activity('replying')
         self.last_chunk = time.monotonic()
+        self.area.queue_draw()
+
+    def audio_activity(self, state, level=0.0):
+        self.set_activity(state)
+        self.audio_level = max(0.0, min(1.0, level))
         self.area.queue_draw()
 
     def acknowledge(self):
@@ -133,6 +140,8 @@ class EmeraldPresence(Gtk.Box):
         energy = intensity(self.state, now - self.started,
                            None if self.last_chunk is None else now - self.last_chunk,
                            self.motion_enabled())
+        if self.state in ('listening', 'speaking') and self.motion_enabled():
+            energy = .18 + .64 * self.audio_level
         self.paint(cr, widget.get_allocated_width(), widget.get_allocated_height(), energy, self.state)
         return False
 
@@ -187,7 +196,7 @@ class EmeraldPresence(Gtk.Box):
                 # The website's friendly curved cursor, readable at small sizes.
                 cr.move_to(3, 7)
                 cr.curve_to(6, 11, 10, 11, 13, 7)
-            elif state == 'replying':
+            elif state in ('replying', 'speaking'):
                 # A small open smile follows the same text-driven energy as the halo.
                 # Reduced motion supplies constant energy, so the mouth stays still.
                 opening = 2 + energy * 4
@@ -195,7 +204,7 @@ class EmeraldPresence(Gtk.Box):
                 cr.curve_to(6, 7, 10, 7, 13, 6)
                 cr.curve_to(11, 8 + opening, 5, 8 + opening, 3, 6)
                 cr.close_path()
-            elif state in ('thinking', 'reading'):
+            elif state in ('thinking', 'reading', 'listening'):
                 cr.move_to(3, 8)
                 cr.curve_to(7, 9, 10, 7, 13, 5)
             else:

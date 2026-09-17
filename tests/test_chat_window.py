@@ -43,6 +43,57 @@ class WindowTests(unittest.TestCase):
         self.window.destroy()
         self.drain()
 
+    def enable_test_voice(self):
+        def enable():
+            self.window.voice.enabled = True
+            self.window.voice.state = 'listening'
+        patcher = patch.object(self.window.voice, 'enable', side_effect=enable)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        commands = patch.object(self.window.voice, 'command')
+        commands.start()
+        self.addCleanup(commands.stop)
+        self.window.voice_button.set_active(True)
+
+    def test_voice_is_off_at_start_and_transcript_keeps_canvas(self):
+        self.assertFalse(self.window.voice.enabled)
+        self.assertFalse(self.window.voice_button.get_active())
+        self.enable_test_voice()
+        with patch.object(self.window.voice, 'speak', return_value=True) as speak:
+            self.window.voice_event({'event': 'transcript', 'text': 'Visually show me an idea'})
+            self.assertGreater(len(self.window.canvas.links), 0)
+            speak.assert_called_once()
+            # Refreshing chat titles must not switch off voice.
+            self.assertTrue(self.window.voice.enabled)
+
+    def test_voice_never_executes_recognized_slash_commands(self):
+        self.enable_test_voice()
+        with patch.object(self.window, 'start_command') as run:
+            self.window.voice_event({'event': 'transcript', 'text': '/run touch /tmp/never'})
+            run.assert_not_called()
+        self.assertIn('/run touch', self.window.buffer_text(self.window.input.get_buffer()))
+        self.assertIn('review', self.window.status.get_text())
+
+    def test_voice_does_not_overwrite_draft_and_switching_chat_disables_it(self):
+        self.enable_test_voice()
+        self.window.input.get_buffer().set_text('My draft')
+        self.window.voice_event({'event': 'transcript', 'text': 'New words'})
+        self.assertEqual(self.window.buffer_text(self.window.input.get_buffer()), 'My draft')
+        self.assertIn('New words', self.window.buffer_text(self.window.buffer))
+        self.window.clear()
+        self.assertFalse(self.window.voice.enabled)
+
+    def test_voice_levels_respect_reduced_motion_and_off(self):
+        self.enable_test_voice()
+        self.window.voice_event({'event': 'state', 'state': 'speaking', 'message': 'Speaking'})
+        self.window.voice_event({'event': 'level', 'state': 'speaking', 'level': .7})
+        self.assertEqual(self.window.presence.state, 'speaking')
+        self.assertEqual(self.window.presence.audio_level, .7)
+        self.window.presence.set_animated(False)
+        self.window.voice_button.set_active(False)
+        self.assertFalse(self.window.voice.enabled)
+        self.assertEqual(self.window.presence.state, 'ready')
+
     def test_visual_request_draws_without_model_and_clear_keeps_chat(self):
         self.window.model_ready = False
         self.window.input.get_buffer().set_text('Visually show me an idea')

@@ -52,9 +52,16 @@ jobs:
       - name: Prepare checksum-pinned offline model
         run: python3 scripts/prepare-llm.py
 
+      - name: Prepare checksum-pinned offline speech models
+        run: python3 scripts/prepare-voice.py
+
       - name: Build Debian 13 amd64 ISO
         run: |
           docker build --pull --platform linux/amd64 -t nora-builder:ci .
+          # Exercise the packaged speech models without network or audio devices.
+          timeout 300 docker run --rm --network none --entrypoint python3 \
+            -e NORA_VOICE_ROOT=/build/config/includes.chroot/opt/nora/voice \
+            nora-builder:ci scripts/verify-voice.py
           # No workspace mount or repository token enters the privileged builder.
           docker run --name nora-ci-build --platform linux/amd64 --privileged nora-builder:ci
           mkdir -p dist

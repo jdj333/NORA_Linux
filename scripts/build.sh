@@ -10,6 +10,11 @@ if [[ $EUID != 0 ]]; then
   exit 1
 fi
 command -v lb >/dev/null
+python3 scripts/prepare-voice.py --verify-only
+test -d config/includes.chroot/opt/nora/voice/python/moonshine_voice || {
+  echo 'Install the pinned voice runtime as described in VOICE.md before building.' >&2
+  exit 1
+}
 test -s config/includes.chroot/opt/nora/llm/model.gguf || {
   echo 'Run python3 scripts/prepare-llm.py before building (see README.md).' >&2
   exit 1

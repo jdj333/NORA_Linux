@@ -28,8 +28,8 @@ See [OS_ACCESS_VALIDATION.md](OS_ACCESS_VALIDATION.md) for the tested ISO and it
 See [SPLIT_PANE_VALIDATION.md](SPLIT_PANE_VALIDATION.md) for the newer live application checks.
 
 NORA speaks as the operating system and can inspect its running Linux environment
-and execute commands. It supports typed interaction; voice input/output is not
-implemented. The small local model can still make factual and command-syntax mistakes.
+and execute commands. It supports typed interaction and optional local voice. Voice starts off;
+see [VOICE.md](VOICE.md) for listening, speaking, audio devices, and privacy. The small local model can still make factual and command-syntax mistakes.
 
 ## NORA's emerald presence
 
@@ -66,11 +66,11 @@ NORA and the canvas** disables motion while retaining state labels. This prefere
 saved locally and is kept when chat history is cleared. The system GTK animation
 preference is also respected. Timers stop at idle, on minimize/unmap, and on close.
 
-The current implementation reacts to text, not sound. No microphone capture,
-speech synthesis, listening state, or speech loopback was added. A future voice
-output layer can drive a speaking animation from the amplitude of audio being
-played; it should use that output signal directly rather than recording NORA's
-own voice as another user message. See [EMERALD_VALIDATION.md](EMERALD_VALIDATION.md).
+When Voice is enabled, listening and speaking have distinct emerald states.
+Their glow follows microphone and playback levels respectively. NORA does not
+record her own output to animate the emerald. Reduced motion keeps these states
+still while preserving their labels. Text-only chat retains its reply animation.
+See [VOICE.md](VOICE.md) for the offline engines, controls, and validation limits.
 
 ## Using the canvas in conversation
 

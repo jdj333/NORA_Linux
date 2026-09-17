@@ -1,0 +1,71 @@
+{
+  "stt": "Moonshine Small Streaming English quantized_26_08_21",
+  "tts": "Kokoro v1.0 int8, af_heart / af_bella",
+  "assets": {
+    "stt/adapter.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/adapter.ort",
+      "sha256": "c665f742364febad597cc9ac1e0b341ffbee0e24a1466e2f3bde95e6e4771762",
+      "bytes": 2870368
+    },
+    "stt/cross_kv.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/cross_kv.ort",
+      "sha256": "e2d3417144e9514055ebfefe8dcc4c0a55a55adcb8530435844c75c53e352bf6",
+      "bytes": 5356536
+    },
+    "stt/decoder_kv.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/decoder_kv.ort",
+      "sha256": "1a05465b1dd955858dfcbee039c0020fb5dd982b0f5094c34e61735d518d771b",
+      "bytes": 81878600
+    },
+    "stt/encoder.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/encoder.ort",
+      "sha256": "2d4d973e91e8aca08c51e7e7efa28a46ab265b63d809d5294d18b86bcd85b993",
+      "bytes": 44148576
+    },
+    "stt/frontend.model.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.model.ort",
+      "sha256": "09b1210ae30dc5f0f3e45f0ebab914c254741323114f53fbbe5ae62cca35058f",
+      "bytes": 26944
+    },
+    "stt/frontend.weights.ort": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/frontend.weights.ort",
+      "sha256": "7ef97521bd4bad3928f5bb6808586f4fcc6e92bd5990394112eed7d4052ec338",
+      "bytes": 7769464
+    },
+    "stt/streaming_config.json": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/streaming_config.json",
+      "sha256": "26f02b6afb22d60871a5efd85c3d38e569cc0ddb6c5eb6e93d3260152ae8a47a",
+      "bytes": 512
+    },
+    "stt/tokenizer.bin": {
+      "url": "https://download.moonshine.ai/model/small-streaming-en/quantized_26_08_21/tokenizer.bin",
+      "sha256": "6884b35fd6377d4c4d32336a0bc152f36b64d1e45b6503683cdc238250a8472d",
+      "bytes": 249974
+    },
+    "tts/model.onnx": {
+      "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/kokoro-v1.0.int8.onnx",
+      "sha256": "6e742170d309016e5891a994e1ce1559c702a2ccd0075e67ef7157974f6406cb",
+      "bytes": 92361271
+    },
+    "tts/voices.bin": {
+      "url": "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin",
+      "sha256": "bca610b8308e8d99f32e6fe4197e7ec01679264efed0cac9140fe9c29f1fbf7d",
+      "bytes": 28214398
+    },
+    "licenses/MOONSHINE-LICENSE": {
+      "url": "https://raw.githubusercontent.com/moonshine-ai/moonshine/234f60faa0eb388b01cdf7e60aca232af37aefda/LICENSE",
+      "sha256": "fa7d1174dd8af6a7cd280be20b80d10095ed4c19b5b20b61a7715c3ad790dc5f",
+      "bytes": 14180
+    },
+    "licenses/KOKORO-LICENSE": {
+      "url": "https://raw.githubusercontent.com/hexgrad/kokoro/dfb907a02bba8152ca444717ca5d78747ccb4bec/LICENSE",
+      "sha256": "c71d239df91726fc519c6eb72d318ec65820627232b2f796219e87dcf35d0ab4",
+      "bytes": 11357
+    },
+    "licenses/KOKORO-ONNX-LICENSE": {
+      "url": "https://raw.githubusercontent.com/thewh1teagle/kokoro-onnx/3596b26764286a7de9d90c363e988d50578918e5/LICENSE",
+      "sha256": "f61fdd0217de9ece8fa699912848d91187d84879fc2e689f0906d0c1299e955e",
+      "bytes": 1080
+    }
+  }
+}
