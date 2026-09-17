@@ -12,8 +12,23 @@ no voice assistant is implemented.
 NORA Terminal opens at login for typed conversations with a bundled, offline
 Qwen2.5 0.5B model. No API key or internet is needed after boot. It explains
 its running OS using live measurements and executes explicit `/run` commands.
-Model-suggested commands have an editable Run button. See [CHAT.md](CHAT.md) for
+A glowing emerald represents NORA above the conversation, pulsing while thinking
+and reacting to incoming reply text. Motion can be disabled in Settings.
+The workspace matches the website's mint/forest palette and bundles DM Sans and
+Space Grotesk for offline use, with smaller conversation text and a dotted canvas.
+Conversation appears on the left, with a visual explanation canvas on the upper right
+and a compact command terminal below it. NORA maps concepts as connected nodes,
+arrows, and decision shapes, with gentle movement and quiet pencil/trash controls.
+“Show images of emerald crystals” searches Wikimedia Commons for sourced images;
+`/image URL` displays a specific image. Diagrams and thumbnails are saved with each chat. The terminal
+shows commands, output, and exit status. Model-suggested commands can be edited there
+before choosing Run. See [CHAT.md](CHAT.md) for
 usage and command limits.
+When online, `/web URL` or “Look up noralinux.com” reads a website and supplies its
+text to follow-up questions, with source URLs and read times shown in chat.
+Saved chats appear in a left sidebar and retain their own context and drafts.
+Settings includes **Clear all history and contexts**. History survives application
+restarts; surviving reboot requires installed or persistent storage.
 
 The first ISO and verification evidence are in `dist/`. See [VALIDATION.md](VALIDATION.md)
 for the tested artifact, checksum, and remaining validation.

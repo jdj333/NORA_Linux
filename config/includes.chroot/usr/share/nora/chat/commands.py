@@ -17,7 +17,7 @@ TIMEOUT_SECONDS = 60
 
 def validate(command):
     if not command.strip():
-        raise ValueError('Enter a command after /run.')
+        raise ValueError('Enter a command to run.')
     if len(command.encode('utf-8')) > MAX_COMMAND_BYTES:
         raise ValueError('Command exceeds 4,096 UTF-8 bytes.')
     if any((ord(c) < 32 and c not in '\n\t') or c in '\u202a\u202b\u202c\u202d\u202e\u2066\u2067\u2068\u2069' for c in command):

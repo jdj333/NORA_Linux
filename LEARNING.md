@@ -398,6 +398,162 @@ These tests attach no host disk and do not validate installation.
   A macOS rerun also exposed duplicate SIGTERM from UI and worker threads; serialize
   signals and send TERM at most once, while retaining escalation to KILL.
 
+## Website reading
+
+- `web_access.py` routes `/web URL`, bare addresses, and explicit natural-language
+  website requests before model inference. This avoids the small offline model's
+  habitual claim that it cannot browse. Reading works even while the model loads;
+  follow-up questions receive bounded source excerpts and a real source URL.
+- Keep HTTP fetching in a disposable Python subprocess, with an overall deadline
+  and cancellation that kills and reaps it. A socket timeout alone does not bound
+  DNS lookup or a server that sends a few bytes repeatedly. Do not make network
+  requests on the GTK main thread.
+- Only HTTP(S) pages are accepted, including on redirects. Never execute page
+  scripts or feed page text into the command runner. Preserve TLS verification,
+  suppress script/style/hidden HTML content, and bound both raw and decompressed
+  bytes. Gzip responses may arrive even when requesting identity encoding.
+- Test with `python3 -m unittest discover -s tests -v`. Web tests use a local
+  HTTP fixture for redirects, HTTP errors, non-text/empty pages, output limits,
+  cancellation, timeouts, gzip expansion, and source context. Separately check a
+  real HTTPS page from inside the guest; host connectivity alone is insufficient.
+- Updating the live guest patches only its temporary overlay. The checked-in
+  `config/includes.chroot/usr/share/nora/chat/` source is what future ISO builds
+  include; an existing ISO or published release is not changed by a live patch.
+- After idle time, inspect a fresh QMP screenshot before typing commands: Xfce may
+  have locked the live session. Unlock with the configured live-user password,
+  then confirm the desktop and terminal focus before continuing an update.
+
+## Conversation and terminal panes
+
+- Keep conversation and command output in separate GTK buffers inside `Gtk.Paned`.
+  Route both chat `/run` and inspection commands through the same runner as the
+  right-side input. Preserve command evidence for subsequent model questions.
+- Preserve unsent drafts: a model proposal must not overwrite a terminal draft,
+  and a command must not clear the chat draft. Restore Run/Send controls after
+  every completion path, including model errors, website failures, and Stop.
+- GTK integration tests need a display and system Python with PyGObject. On
+  Debian/Ubuntu: install `python3-gi gir1.2-gtk-3.0 xvfb xauth`, then run
+  `xvfb-run -a /usr/bin/python3 -m unittest discover -s tests -v`. On macOS without
+  GTK these tests skip; that is not evidence that the UI works. The live guest can
+  run `NORA_CHAT_DIR=/usr/share/nora/chat python3 /tmp/nora-test-chat-window.py`
+  after staging the test file, without installing a second desktop stack.
+- For cancellation tests, wait for actual output before pressing Stop; cancelling
+  before process launch exercises a different path. Do not infer output from the
+  echoed command text itself.
+- During a QMP-driven guest update, wait for the shell prompt after `sudo tar`
+  before typing the restart command. Sudo may flush queued input and drop the
+  beginning of a command typed too soon.
+
+## Persistent chat history
+
+- Save each chat's display and model context together: conversation, command
+  output, both drafts, cwd, recent exchanges, last command evidence, and fetched
+  page. Do not replay saved commands. Validate stored state before loading it.
+- `history_store.py` uses SQLite transactions in `$XDG_STATE_HOME/nora/` (fallback
+  `~/.local/state/nora/`), directory mode 0700 and file mode 0600. Secure-delete
+  clears deleted database content; it is not a guarantee against filesystem
+  snapshots, backups, or storage forensics. History is not encrypted.
+- Autosave buffer changes with a short GTK timeout, then flush synchronously on
+  switch/close. Block switching and deletion during an active operation to keep
+  late callbacks out of other chats. Cancel pending autosave before clearing all
+  state, and ignore results from obsolete requests.
+- Test UI persistence with an injected temporary database path, never the user's
+  real history. Cover reopening, per-chat context isolation, unsent drafts,
+  deletion followed by reopening, failed save/delete, and no automatic execution.
+- Do not rebuild a GTK ListBox by removing all rows inside `row-selected`.
+  Programmatic selection tests passed, but a real mouse selection crashed GTK
+  because event handling still referenced the removed row. Keep existing row
+  widgets and update labels in place; add/remove only changed chat IDs. Test real
+  pointer interaction as well as asserting that a selected row retains its parent.
+- Persistence in a live overlay survives app restarts only. Test full reboot
+  persistence separately on an installed system or persistent home; do not claim
+  that a live application patch adds disk persistence to the VM or ISO.
+
+## Shared concept canvas
+
+- Keep the right workspace in a vertical `Gtk.Paned`: canvas above, compact
+  command console below. Reduce terminal padding and input height so its minimum
+  widget sizes do not consume the space intended for the board.
+- `Gtk.Layout` supports movable card widgets and scrolling without a new browser
+  dependency. Drag headers using root pointer coordinates; use Layout.move and
+  grow the scroll extent. Save positions on release, not every motion event.
+- Extract cards from completed visible replies and real tool results. Label
+  model excerpts as ideas, retain sources on measured facts, and exclude fenced
+  code blocks. Keep notes separate from command execution and bound the subset
+  sent back to the local model. The canvas does not reveal hidden reasoning.
+- Save the board with each chat and treat missing canvas state as an empty board
+  for older records. Include cards in Clear all history. Defer removal/replacement
+  of clicked card widgets until their GTK event returns, and reject queued edits
+  after the chat's canvas generation changes.
+- Reuse `python3 -m unittest discover -s tests -p test_canvas_model.py -v` for
+  extraction, category layout, bounds, and model-context limits. GTK checks also
+  cover edits, positions, chat isolation, and clearing; inspect real mouse dragging
+  and modal controls inside the guest before claiming the canvas is ready.
+
+## Connected canvas and web images
+
+- Keep the small model's visual format readable: short `A -> B -> C` lines,
+  decision names ending in `?`, and `Name: explanation` bullets. Parse these into
+  bounded nodes/links; fall back to connected excerpts. Avoid requiring a second
+  model call or a large JSON tool schema for every explanation.
+- Put a DrawingArea behind node overlays in Gtk.Layout for connector rendering.
+  Keep display positions separate from saved target positions during animation;
+  redraw links as nodes move and remove incident links when deleting a node.
+  Use actual per-node heights for ports and extents. Wait for allocation before
+  testing layout: arranging before map gives a width of 1 and misleading columns.
+- Use `Gtk.Button.new_from_icon_name` with symbolic pencil/trash names, tooltips,
+  accessible names, and hover/focus contrast. Preserve keyboard drag and deferred
+  widget replacement from the original canvas.
+- Store small PNG thumbnails inside chat state, not an unrelated cache. Restore
+  cached thumbnails without network access. Cancel image workers on remove, chat
+  switch, history clearing, and close; reject results carrying old generations.
+- Image downloads use at most two cancellable child processes. Check public IPs
+  at every redirect and connect to the checked address while retaining the HTTP
+  Host/TLS name. Bound bytes, dimensions, elapsed time, and decoded thumbnail size;
+  load only raster formats. Never let an arbitrary model-generated URL fetch a
+  local endpoint. Page-discovered URLs and explicit user URLs take the same path.
+- Wikimedia Commons image search uses `generator=search`, file namespace 6, and
+  imageinfo thumbnails plus Artist/LicenseShortName. Keep the file description URL
+  with the credit; search relevance is imperfect. GdkPixbuf decoding is tested in
+  Linux, since the Mac checkout lacks PyGObject.
+- Reuse `python3 -m unittest discover -s tests -v` (local HTTP fixture permission
+  required), plus the GTK suite inside NORA. Screenshot a controlled response
+  separately from any claim about a real model-generated explanation.
+
+## Emerald presence and activity animation
+
+- Website styling source: `https://noralinux.com/styles.css`; DM Sans body,
+  Space Grotesk headings, accent `#a0f3c0`. Bundle TTFs and OFL licenses in
+  `config/includes.chroot/usr/share/fonts/truetype/nora`, record source commit and
+  hashes, then run `fc-cache -f /usr/share/fonts/truetype/nora` in an updated live
+  guest. Verify with `fc-match 'DM Sans'` and `fc-match 'Space Grotesk'` before
+  judging screenshots. Keep chat sans-serif and both command views monospace.
+- Share GTK CSS and Cairo colors through `style.py`; otherwise updating CSS
+  leaves canvas nodes and connectors on the old palette. Draw the dot grid only
+  within Cairo's clip extents and size its layer to at least the scroll viewport.
+
+- Draw NORA's faceted emerald as a small GTK/Cairo vector, retaining the `>`
+  logo mark and using its cursor as a mouth, like the website's smile. Map mouth
+  shapes to activity (ready smile, curious thinking/reading, open reply smile,
+  focused/resting straight cursor). Use the existing energy envelope for mouth
+  motion so reduced-motion preferences apply to both face and glow without a
+  second timer. This avoids repeatedly decoding large raster assets or adding a
+  browser/WebGL runtime. Debian needs both `python3-cairo` and `python3-gi-cairo`;
+  import cairo and use `gi.require_foreign('cairo')` before drawing callbacks.
+- Drive state from request lifecycle events: busy → thinking/reading/command,
+  text chunks → replying, cancellation → stopping, completion → ready/loading.
+  Do not label text generation as spoken audio or microphone listening.
+- Limit redraws to 20 Hz during active work, with no idle animation timer. Stop
+  timers on unmap, minimize, and destruction; honor `gtk-enable-animations` and
+  the local user preference. A text label must explain the state without motion.
+- `presence_model.py` keeps the envelope independently testable: slow 3.6-second
+  thinking pulse, bounded text-chunk accents with decay, and steady reduced-motion
+  states. GTK tests cover callbacks, Cairo output, preference persistence, and
+  cleanup. Read the actual guest display before claiming the image is visible.
+- Future speech should drive the emerald from the played audio's amplitude. Do
+  not record synthesized speech through the microphone as fresh user input; use
+  an output-audio signal and keep playback, interruption, and listening distinct.
+
 When extending these notes, record the symptom, confirmed cause or clearly labeled
 hypothesis, smallest working fix, reusable command, and verification limit. Keep
 artifact-specific results in `VALIDATION.md` and reusable lessons here.
