@@ -15,6 +15,8 @@ test -s config/includes.chroot/opt/nora/llm/model.gguf || {
   exit 1
 }
 mkdir -p dist
+install -Dm644 music/NoraLinuxStartupSong.mp3 \
+  config/includes.chroot/usr/share/nora/music/NoraLinuxStartupSong.mp3
 lb config
 lb build 2>&1 | tee dist/build.log
 iso=nora-linux-13-amd64.hybrid.iso

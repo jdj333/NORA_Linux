@@ -7,6 +7,7 @@ WORKDIR /build
 COPY auto /build/auto
 COPY config /build/config
 COPY scripts /build/scripts
+COPY music /build/music
 RUN test -s config/includes.chroot/opt/nora/llm/model.gguf
 RUN chmod +x auto/config scripts/*.sh config/hooks/live/*.hook.*
 CMD ["./scripts/build.sh"]

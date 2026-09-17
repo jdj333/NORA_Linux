@@ -123,6 +123,7 @@ def evidence(cards):
 def reply_scene(prompt, answer, source=None):
     """Build a bounded explanation graph from visible Markdown, never execute it."""
     text = re.sub(r'```.*?```', '', answer, flags=re.S)
+    text = re.sub(r'^Canvas: (?:replace|arrange|clear)\s*$', '', text, flags=re.M)
     images = re.findall(r'!\[([^]\n]{0,80})\]\((https?://[^\s)]+)\)', text)[:2]
     text = re.sub(r'!\[[^]\n]*\]\([^)]*\)', '', text)
     nodes, links, by_title = [], [], {}

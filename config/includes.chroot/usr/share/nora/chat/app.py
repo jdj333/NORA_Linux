@@ -19,6 +19,8 @@ from canvas_model import evidence as canvas_evidence
 from presence import EmeraldPresence
 from web_access import normalize_url
 from image_search import ImageSearchRequest, search_target
+from startup_audio import StartupAudio
+from canvas_intent import action as canvas_action, example as canvas_example
 
 from style import CSS, COLORS
 
@@ -34,6 +36,7 @@ class Terminal(Gtk.ApplicationWindow):
         self.last_page = None
         self.request = None
         self.closed = False
+        self.startup_audio = StartupAudio()
         self.probing = False
         self.model_ready = False
         self.store = None
@@ -556,7 +559,7 @@ class Terminal(Gtk.ApplicationWindow):
         self.reset_chat()
         self.input.grab_focus()
 
-    def exchange(self, prompt, answer, source=None):
+    def exchange(self, prompt, answer, source=None, draw=True):
         self.name_chat(prompt)
         self.append('YOU  > ', 'you')
         self.append(prompt + '\n\n')
@@ -566,7 +569,8 @@ class Terminal(Gtk.ApplicationWindow):
             self.append(source + '\n', 'note')
         self.append('\n')
         self.history.extend([{'role': 'user', 'content': prompt}, {'role': 'assistant', 'content': answer}])
-        self.canvas.record(prompt, answer, source)
+        if draw:
+            self.canvas.record(prompt, answer, source)
         self.presence.acknowledge()
         self.input.get_buffer().set_text('')
         self.schedule_save()
@@ -729,6 +733,20 @@ class Terminal(Gtk.ApplicationWindow):
         buffer = self.input.get_buffer()
         prompt = buffer.get_text(buffer.get_start_iter(), buffer.get_end_iter(), False).strip()
         if not prompt:
+            return
+        gesture = canvas_action(prompt)
+        if gesture:
+            if gesture == 'clear':
+                self.canvas.clear_scene()
+                answer = 'I’ve cleared our canvas for a fresh idea. Our conversation is still here.'
+            else:
+                self.canvas.organize()
+                answer = 'I’ve arranged our canvas so the relationships are easier to follow.'
+            self.exchange(prompt, answer, draw=False)
+            return
+        sketch = canvas_example(prompt)
+        if sketch:
+            self.exchange(prompt, sketch)
             return
         image_match = re.match(r'(?i)^(?:/image\s+|(?:please\s+)?show\s+(?:me\s+)?(?:an?\s+)?image\s+)(\S+)\s*$', prompt)
         if prompt == '/image' or image_match:
@@ -910,6 +928,7 @@ class Terminal(Gtk.ApplicationWindow):
         if self.store and not self.persist_chat():
             return True
         self.closed = True
+        self.startup_audio.stop()
         self.presence.shutdown()
         self.canvas.shutdown()
         if self.save_source is not None:
@@ -934,6 +953,7 @@ class Application(Gtk.Application):
             Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), provider,
                                                      Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
             window = Terminal(self)
+            GLib.idle_add(window.startup_audio.play)
         window.present()
 
 

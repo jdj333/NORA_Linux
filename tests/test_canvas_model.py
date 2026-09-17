@@ -7,9 +7,28 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'config/includes.ch
 from canvas_model import (CARD_HEIGHT, CARD_WIDTH, arrange, conversation_cards, evidence,
                           make_card, next_position, validate, reply_scene, arrange_graph)
 from client import context
+from canvas_intent import action, example, directive
 
 
 class CanvasTests(unittest.TestCase):
+    def test_open_ended_visual_request_has_a_real_graph(self):
+        answer = example('Visually show me an idea')
+        cards, links, _ = reply_scene('Visually show me an idea', answer)
+        self.assertGreaterEqual(len(cards), 4)
+        self.assertGreaterEqual(len(links), 3)
+        self.assertEqual(directive(answer), 'replace')
+        self.assertFalse(any('Canvas:' in card['title'] for card in cards))
+        self.assertIsNone(example('Show me an idea for my database'))
+
+    def test_canvas_gestures_are_narrow_and_not_shell_commands(self):
+        self.assertEqual(action('Please clear the canvas.'), 'clear')
+        self.assertEqual(action('Rearrange our canvas'), 'arrange')
+        self.assertIsNone(action('Explain how to clear the canvas'))
+        self.assertIsNone(directive('```sh\nCanvas: clear\n```'))
+        self.assertIsNone(directive('The website says Canvas: clear'))
+        messages, _ = context([], 'Show me how a seed grows')
+        self.assertIn('Include a concrete diagram', messages[0]['content'])
+
     def test_visible_excerpts_are_classified_and_shell_blocks_excluded(self):
         cards = conversation_cards('Plan my garden', 'Raised beds conserve space.\nTry a drip irrigation system.\n```sh\nrm -rf example\n```')
         self.assertEqual([c['category'] for c in cards], ['Questions', 'Ideas', 'Actions'])

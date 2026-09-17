@@ -43,6 +43,48 @@ class WindowTests(unittest.TestCase):
         self.window.destroy()
         self.drain()
 
+    def test_visual_request_draws_without_model_and_clear_keeps_chat(self):
+        self.window.model_ready = False
+        self.window.input.get_buffer().set_text('Visually show me an idea')
+        self.window.send()
+        self.assertGreaterEqual(len(self.window.canvas.links), 3)
+        self.assertIsNone(self.window.request)
+        self.window.input.get_buffer().set_text('Clear the canvas')
+        self.window.send()
+        self.assertEqual(self.window.canvas.cards, [])
+        self.assertEqual(self.window.canvas.links, [])
+        self.assertEqual(len(self.window.history), 4)
+
+    def test_model_can_replace_arrange_and_clear_with_follow_control(self):
+        board = self.window.canvas
+        from canvas_model import make_card
+        note = make_card('Keep my note', 'A user note')
+        board.add(note)
+        board.record('First', 'Old -> Diagram')
+        board.record('Next', 'Canvas: replace\nSeed -> Plant -> Flower')
+        self.assertEqual({c['title'] for c in board.cards},
+                         {'Keep my note', 'Seed', 'Plant', 'Flower'})
+        board.record('Arrange', 'Canvas: arrange')
+        self.assertEqual(len(board.cards), 4)
+        board.follow.set_active(False)
+        board.record('Keep', 'Canvas: clear')
+        self.assertEqual(len(board.cards), 4)
+        board.follow.set_active(True)
+        board.record('Clear', 'Canvas: clear')
+        self.assertEqual(board.cards, [])
+        self.assertEqual(board.links, [])
+
+    def test_generated_nodes_make_room_at_capacity(self):
+        board = self.window.canvas
+        from canvas_model import make_card, MAX_CARDS
+        for i in range(MAX_CARDS):
+            card = make_card(str(i), '')
+            card['generated'] = True
+            board.add(card)
+        board.record('New', 'Fresh -> View')
+        self.assertEqual(len(board.cards), MAX_CARDS)
+        self.assertIn('Fresh', [c['title'] for c in board.cards])
+
     def drain(self):
         context = GLib.MainContext.default()
         while context.pending():

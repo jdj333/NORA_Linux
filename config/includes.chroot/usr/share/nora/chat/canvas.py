@@ -12,6 +12,7 @@ from canvas_model import (CATEGORIES, CARD_HEIGHT, CARD_WIDTH, MAX_CARDS,
 from canvas_drawing import connections, node_shape, grid
 from canvas_images import ImageRequest
 from web_access import WebError, normalize_url
+from canvas_intent import directive
 
 
 class Canvas(Gtk.Box):
@@ -192,7 +193,24 @@ class Canvas(Gtk.Box):
     def record(self, prompt, answer, source=None, allowed_images=()):
         if not self.follow.get_active():
             return
+        gesture = directive(answer) if source is None else None
+        if gesture == 'clear':
+            self.clear_scene()
+            return
+        if gesture == 'arrange':
+            self.organize()
+            return
         nodes, links, images = reply_scene(prompt, answer, source)
+        if gesture == 'replace':
+            self.clear_scene(generated_only=True)
+        # Retire old generated explanations before the board reaches its limit.
+        for old in list(self.cards):
+            if len(self.cards) + len(nodes) + len(images) <= MAX_CARDS:
+                break
+            if old.get('generated'):
+                self.remove_by_id(old['id'])
+        for node in nodes:
+            node['generated'] = True
         existing = {c['id'] for c in self.cards}
         # Keep each explanation connected, including repeated concepts across turns.
         mapping = {}
@@ -225,6 +243,16 @@ class Canvas(Gtk.Box):
         for alt, url in images:
             if url in allowed_images:
                 self.add_image(url, alt or 'Website image', source or 'Image from the page')
+        self.update_extent()
+        self.changed()
+
+    def clear_scene(self, generated_only=False):
+        for card in list(self.cards):
+            # Legacy generated cards predate the explicit ownership flag.
+            generated = card.get('generated', card['source'] in (
+                'NORA explanation', 'NORA reply · excerpt', 'Your message'))
+            if not generated_only or generated:
+                self.remove_by_id(card['id'])
         self.update_extent()
         self.changed()
 
@@ -488,7 +516,7 @@ class Canvas(Gtk.Box):
         card = next((c for c in self.cards if c['id'] == card_id), None)
         if card:
             self.stop_motion()
-            updated.update(id=card['id'], x=card['x'], y=card['y'])
+            updated.update(id=card['id'], x=card['x'], y=card['y'], generated=False)
             self.widgets.pop(card_id).destroy()
             card.update(updated)
             self.render(card)

@@ -3,6 +3,7 @@ import http.client
 import json
 import socket
 import threading
+from canvas_intent import visual_request
 
 SYSTEM_PROMPT = (
     'You are NORA Linux 13, the operating system, speaking as I/my. '
@@ -14,9 +15,15 @@ SYSTEM_PROMPT = (
     'You can inspect your OS and execute user commands. Propose actions as one '
     'fenced sh block for the user to Run. Never claim a command ran or succeeded '
     'without a real result. Keep replies brief. '
-    'Your canvas illustrates your explanation alongside chat. For processes, add a short '
+    'You HAVE a working visual canvas and can draw diagrams on it. Use it often to '
+    'explain ideas, plans, comparisons and relationships, even without being asked. '
+    'When asked to show an idea, choose a concrete example and draw it; do not deny '
+    'your canvas capability. For processes, add a short '
     'map on its own line: A -> B -> C. Reuse names for branches; end decision names with ?. '
     'For concepts, use short bullets Name: explanation. These become connected nodes. '
+    'You may put Canvas: replace on its own line before a fresh diagram to replace '
+    'your previous visual explanation, Canvas: arrange to reorganize the canvas, '
+    'or Canvas: clear to clear it. These are canvas gestures, never shell commands. '
     'To illustrate with an image use ![caption](URL) only with an exact WEB_PAGE images URL. '
     'Never invent image URLs. Describe key ideas and relationships for the user.'
 )
@@ -43,6 +50,10 @@ def context(history, prompt, system_facts=None, command_result=None, web_page=No
     while previous and sum(len(m['content'].encode('utf-8')) for m in previous) + len(prompt.encode('utf-8')) > HISTORY_BYTES:
         del previous[:2]
     system = SYSTEM_PROMPT
+    if visual_request(prompt):
+        system += ('\nThis request benefits from your canvas. Include a concrete diagram '
+                   'using short A -> B lines or Name: explanation bullets. '
+                   'Use Canvas: replace for a fresh visual. Chat and canvas work together.')
     if system_facts is not None:
         system += '\nLIVE_OS_FACTS:\n' + json.dumps(system_facts, ensure_ascii=False)
     if command_result is not None:

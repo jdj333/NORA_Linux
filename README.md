@@ -1,34 +1,86 @@
+<p align="center">
+  <a href="https://noralinux.com/">
+    <img src="logo.png" alt="NORA Linux — glowing emerald with a terminal symbol" width="320">
+  </a>
+</p>
+
 # NORA Linux
 
-Debian 13 (Trixie) derivative with an Xfce desktop, emerald accents, dark GTK theme,
-and the supplied `logo.png`. Tracks current Trixie, security, and point updates;
-does not follow Debian testing or a future Debian major release.
+**A little emerald. A more personal Linux.**
 
-Target: amd64 PCs, hybrid USB/DVD live ISO with BIOS and UEFI boot entries and
-Debian's live installer. Secure Boot and physical hardware support require testing.
-This is a prototype, not a validated release. The logo's tagline is branding;
-no voice assistant is implemented.
+NORA is a Debian 13 desktop that brings local AI into the way you use your
+computer. Talk through an idea, ask about your system, explore a website, or work
+through a task with conversation, visual explanations, and a command terminal
+in one workspace. The emerald is NORA's face: a familiar, expressive presence
+that responds as she works.
 
-NORA Terminal opens at login for typed conversations with a bundled, offline
-Qwen2.5 0.5B model. No API key or internet is needed after boot. It explains
-its running OS using live measurements and executes explicit `/run` commands.
-A glowing emerald represents NORA above the conversation, pulsing while thinking
-and reacting to incoming reply text. Motion can be disabled in Settings.
-The workspace matches the website's mint/forest palette and bundles DM Sans and
-Space Grotesk for offline use, with smaller conversation text and a dotted canvas.
-Conversation appears on the left, with a visual explanation canvas on the upper right
-and a compact command terminal below it. NORA maps concepts as connected nodes,
-arrows, and decision shapes, with gentle movement and quiet pencil/trash controls.
-“Show images of emerald crystals” searches Wikimedia Commons for sourced images;
-`/image URL` displays a specific image. Diagrams and thumbnails are saved with each chat. The terminal
-shows commands, output, and exit status. Model-suggested commands can be edited there
-before choosing Run. See [CHAT.md](CHAT.md) for
-usage and command limits.
-When online, `/web URL` or “Look up noralinux.com” reads a website and supplies its
-text to follow-up questions, with source URLs and read times shown in chat.
-Saved chats appear in a left sidebar and retain their own context and drafts.
-Settings includes **Clear all history and contexts**. History survives application
-restarts; surviving reboot requires installed or persistent storage.
+NORA's identity is the operating system itself. Her chat workspace connects that
+identity to real system information and visible actions, helping you understand
+both an answer and what happens on your computer.
+
+**[Visit noralinux.com](https://noralinux.com/)** ·
+[Meet NORA](https://noralinux.com/meet-nora/) ·
+[Download a prerelease](https://github.com/jdj333/NORA_Linux/releases) ·
+[Chat guide](CHAT.md)
+
+## One workspace for conversation, ideas, and action
+
+NORA Terminal opens maximized when you log in. Its dark forest surfaces, mint
+accents, and bundled DM Sans and Space Grotesk fonts keep the interface quiet
+and readable, even offline.
+The bundled NORA startup song plays once when the chat window opens, through
+the desktop's default audio output. Closing the window stops the music.
+
+- **Conversation:** chat with the bundled local Qwen2.5 0.5B model. No API key or
+  internet connection is needed for local conversation after boot.
+- **A shared visual canvas:** NORA communicates concepts through connected nodes,
+  arrows, decision shapes, and images alongside her written replies. The canvas
+  is a place to explain relationships and develop ideas together, not a view
+  into the model's private reasoning.
+- **A separate command terminal:** see commands, output, and exit status below
+  the canvas. It starts collapsed to leave room for visual work. Explicit
+  `/run` commands execute locally; model-proposed commands can be reviewed and
+  edited before choosing **Run**.
+- **Awareness of her system:** ask NORA about disk space, memory, or the running
+  OS and receive answers based on live system measurements.
+- **Web access when online:** read website text for follow-up questions and
+  bring sourced images from Wikimedia Commons or an image URL onto the canvas.
+- **Saved conversations:** return to chats in the left sidebar, with their own
+  drafts, context, terminal output, and canvas. Settings includes
+  **Clear all history and contexts**.
+- **An emerald with expression:** NORA smiles when ready, gently pulses while
+  processing, and reacts to incoming reply text. Animation can be disabled.
+
+For example, try:
+
+- “How much disk space do you have?”
+- “Help me plan a small Linux project.”
+- “Look up noralinux.com.”
+- “Show images of emerald crystals.”
+
+See [CHAT.md](CHAT.md) for controls, web and image commands, storage details, and
+command limits.
+
+## Current status and supported hardware
+
+NORA is a working prototype built on **Debian 13 (Trixie)** with an Xfce desktop.
+It tracks Trixie, security, and point updates rather than Debian testing or a
+future major release.
+
+The current build is an **amd64 live ISO for Intel/AMD PCs**, with hybrid USB/DVD
+support, BIOS and UEFI boot entries, and Debian's live installer. It does not boot
+on Raspberry Pi or other ARM devices; those need a separate ARM image. Secure
+Boot and physical hardware compatibility still require testing.
+
+Interaction is currently **typed**. Local listening and speech are being
+researched and are not implemented; the planned voice mode will be off by
+default. The small language model can make mistakes, and the current model uses
+image captions and website text rather than seeing images itself.
+
+Chats are stored locally and survive application restarts. Keeping them across
+reboots requires an installed system or persistent storage; a temporary live
+session loses its history when shut down. Local chat works offline, while reading
+websites and finding web images requires a connection.
 
 The first ISO and verification evidence are in `dist/`. See [VALIDATION.md](VALIDATION.md)
 for the tested artifact, checksum, and remaining validation.

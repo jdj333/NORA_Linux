@@ -5,6 +5,11 @@ terminal. It opens automatically at Xfce login and is also available from the
 Applications menu. It opens maximized, with desktop panels and window controls
 visible; use the window's restore button to resize it. Type a message and press
 Enter; Shift+Enter adds a line.
+The bundled `music/NoraLinuxStartupSong.mp3` plays once when the application
+opens a new window, including at login. It does not loop or replay when switching
+chats or bringing an existing window forward. Closing the window stops playback;
+audio-device or decoder failures leave chat available. Playback uses the desktop's
+default audio output and volume and does not open the microphone.
 Conversation and website results appear on the left. A shared concept canvas
 occupies the upper right, with a compact command terminal underneath. The terminal
 starts collapsed to give the canvas more room. Click **Terminal · Show commands**
@@ -66,6 +71,24 @@ speech synthesis, listening state, or speech loopback was added. A future voice
 output layer can drive a speaking animation from the amplitude of audio being
 played; it should use that output signal directly rather than recording NORA's
 own voice as another user message. See [EMERALD_VALIDATION.md](EMERALD_VALIDATION.md).
+
+## Using the canvas in conversation
+
+“Visually show me an idea” immediately sketches a concrete example with connected
+nodes, even while the language model is loading. For a specific topic, ask for a
+diagram, explanation, comparison, or plan; the model is encouraged to include
+short maps and concept bullets in ordinary replies too.
+
+NORA can include `Canvas: replace`, `Canvas: arrange`, or `Canvas: clear` on its
+own line in a reply. These gestures replace her previous explanation, rearrange
+the board, or clear it. They only affect the canvas and never execute commands.
+Replacing an explanation preserves manually added or edited notes. When the board
+fills, older generated nodes make room for new visuals. **Follow chat** pauses
+automatic canvas changes when unchecked. Say “Clear the canvas” or “Arrange the
+canvas” to act on the board directly, without deleting conversation history.
+
+The small model can still miss a requested diagram; the prompt guidance does not
+guarantee every generated response will use the canvas.
 
 ## Saved chats and settings
 

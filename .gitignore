@@ -19,4 +19,5 @@
 /config/common
 /config/source
 /config/includes.chroot/opt/nora/llm/
+/config/includes.chroot/usr/share/nora/music/
 __pycache__/
